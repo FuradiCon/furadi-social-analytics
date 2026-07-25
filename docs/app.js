@@ -114,7 +114,10 @@ function renderKPIs(ch){
 /* Counts every number inside a .kpi-value up from zero while preserving the
    surrounding characters (commas, "h"/"m", signs) exactly as formatted. */
 function animateKpiValues(root){
-  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  // requestAnimationFrame never fires on a hidden document (backgrounded tab,
+  // headless/screenshot tooling that never grants visibility) — without this
+  // guard the count-up gets stuck at its first frame (all zeros) forever.
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.hidden) return;
   const duration = 750;
   root.querySelectorAll('.kpi-value').forEach(el => {
     const finalText = el.textContent;
