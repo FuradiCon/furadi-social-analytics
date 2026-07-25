@@ -1,5 +1,28 @@
 from unittest.mock import MagicMock, patch
-from scripts.youtube_pipeline import fetch_top_videos, thread_needs_reply, fetch_recent_comments
+
+import pytest
+
+from scripts.youtube_pipeline import (
+    fetch_top_videos, thread_needs_reply, fetch_recent_comments, get_credentials,
+)
+
+
+def test_get_credentials_raises_catchable_runtimeerror_when_no_token_and_no_client_secret(tmp_path):
+    missing_token = str(tmp_path / "token_missing.json")
+    missing_secret = str(tmp_path / "client_secret.json")
+
+    with patch("scripts.youtube_pipeline.CLIENT_SECRET_FILE", missing_secret):
+        with pytest.raises(RuntimeError):
+            get_credentials(missing_token)
+
+        # SystemExit is NOT a subclass of Exception, so a sys.exit() here would slip
+        # past build_data.py's per-channel `except Exception` and kill the whole run.
+        caught = False
+        try:
+            get_credentials(missing_token)
+        except Exception:
+            caught = True
+        assert caught is True
 
 
 @patch("scripts.youtube_pipeline.build")
@@ -17,12 +40,12 @@ def test_fetch_top_videos_returns_ranked_videos_with_thumbnails(mock_build):
     }
     mock_build.side_effect = [analytics, youtube]
 
-    with patch("scripts.youtube_pipeline.download_data_uri", return_value="data:image/jpeg;base64,AAA"):
-        videos = fetch_top_videos(creds=MagicMock(), start_date="2026-07-01", end_date="2026-07-28", channel_id="chan1")
+    videos = fetch_top_videos(creds=MagicMock(), start_date="2026-07-01", end_date="2026-07-28", channel_id="chan1")
 
+    # Thumbnails link straight to YouTube's CDN — never base64-embedded into data.json.
     assert videos == [
-        {"title": "First", "thumb": "data:image/jpeg;base64,AAA", "views": 500, "url": "https://www.youtube.com/watch?v=vid1"},
-        {"title": "Second", "thumb": "data:image/jpeg;base64,AAA", "views": 300, "url": "https://www.youtube.com/watch?v=vid2"},
+        {"title": "First", "thumb": "http://x/1.jpg", "views": 500, "url": "https://www.youtube.com/watch?v=vid1"},
+        {"title": "Second", "thumb": "http://x/2.jpg", "views": 300, "url": "https://www.youtube.com/watch?v=vid2"},
     ]
 
 

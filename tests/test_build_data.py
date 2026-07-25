@@ -1,5 +1,4 @@
 import json
-import os
 from scripts.build_data import build, download_instagram_thumbnails
 
 CHANNEL_CFGS = [
@@ -87,3 +86,56 @@ def test_download_instagram_thumbnails_skips_existing_file(tmp_path, monkeypatch
     result = download_instagram_thumbnails(bundle, str(assets_dir))
 
     assert result["topVideos"][0]["thumb"] == "assets/media1.jpg"
+
+
+def test_download_instagram_thumbnails_survives_one_failed_download(tmp_path, monkeypatch):
+    assets_dir = tmp_path / "assets"
+    assets_dir.mkdir()
+
+    def flaky_download(url, dest_path):
+        if "bad" in url:
+            raise OSError("HTTP Error 403: Forbidden")
+        with open(dest_path, "wb") as f:
+            f.write(b"jpeg-bytes")
+
+    monkeypatch.setattr("scripts.build_data.download_binary", flaky_download)
+
+    bundle = {"topVideos": [
+        {"mediaId": "good1", "thumbUrl": "http://x/good1.jpg"},
+        {"mediaId": "bad1", "thumbUrl": "http://x/bad1.jpg"},
+        {"mediaId": "good2", "thumbUrl": "http://x/good2.jpg"},
+    ]}
+    result = download_instagram_thumbnails(bundle, str(assets_dir))
+
+    posts = result["topVideos"]
+    assert len(posts) == 3
+    assert posts[0]["thumb"] == "assets/good1.jpg"
+    assert posts[1]["thumb"] == ""
+    assert posts[2]["thumb"] == "assets/good2.jpg"
+
+
+def test_build_keeps_instagram_bundle_when_a_thumbnail_download_fails(tmp_path, monkeypatch):
+    def always_failing_download(url, dest_path):
+        raise OSError("HTTP Error 403: Forbidden")
+
+    monkeypatch.setattr("scripts.build_data.download_binary", always_failing_download)
+
+    def fake_instagram_fetcher(*a, **kw):
+        return {"slug": "instagram", "platform": "instagram", "followers": 1234, "topVideos": [
+            {"mediaId": "m1", "thumbUrl": "http://x/m1.jpg"},
+            {"mediaId": "m2", "thumbUrl": "http://x/m2.jpg"},
+        ]}
+
+    published = build(
+        channel_cfgs=CHANNEL_CFGS,
+        channel_fetcher=_good_bundle,
+        instagram_fetcher=fake_instagram_fetcher,
+        out_dir=str(tmp_path),
+    )
+
+    assert published is True
+    data = json.loads((tmp_path / "data.json").read_text())
+    ig = data["channels"][-1]
+    assert ig["platform"] == "instagram"
+    assert ig["followers"] == 1234
+    assert len(ig["topVideos"]) == 2

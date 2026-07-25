@@ -1,7 +1,6 @@
 import base64
 import datetime
 import os
-import sys
 import urllib.request
 
 from google.auth.transport.requests import Request
@@ -36,7 +35,11 @@ def get_credentials(token_file):
             creds.refresh(Request())
         else:
             if not os.path.exists(CLIENT_SECRET_FILE):
-                sys.exit(f"Missing {CLIENT_SECRET_FILE} and no valid refresh token in {token_file}.")
+                # RuntimeError (not SystemExit) so build_data.py's per-channel
+                # `except Exception` can catch it and keep the other accounts alive.
+                raise RuntimeError(
+                    f"Missing {CLIENT_SECRET_FILE} and no valid refresh token in {token_file}."
+                )
             flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
             creds = flow.run_local_server(port=0)
         with open(token_file, "w") as f:
@@ -55,7 +58,7 @@ def fetch_report(creds, start_date, end_date, metrics, dimensions, channel_id="M
     )
 
 
-def download_data_uri(url, what):
+def download_data_uri(url):
     if not url:
         return ""
     try:
@@ -92,7 +95,9 @@ def fetch_top_videos(creds, start_date, end_date, channel_id, limit=4):
         thumb_url = (thumbs.get("high") or thumbs.get("medium") or thumbs.get("default") or {}).get("url")
         videos.append({
             "title": snippet.get("title", ""),
-            "thumb": download_data_uri(thumb_url, f"thumbnail for {video_id}"),
+            # Link straight to YouTube's permanent thumbnail CDN URL. Embedding these
+            # as base64 would bloat data.json (and every hourly commit) by ~400KB.
+            "thumb": thumb_url or "",
             "views": views,
             "url": f"https://www.youtube.com/watch?v={video_id}",
         })
@@ -133,7 +138,7 @@ def fetch_recent_comments(creds, channel_id, limit=4):
         comments.append({
             "id": item.get("id", ""),
             "author": top.get("authorDisplayName", ""),
-            "avatar": download_data_uri(avatar_url, "comment avatar"),
+            "avatar": download_data_uri(avatar_url),
             "text": top.get("textDisplay", ""),
             "likes": top.get("likeCount", 0),
             "publishedAt": top.get("publishedAt", ""),

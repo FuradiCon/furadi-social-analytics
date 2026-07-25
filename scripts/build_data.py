@@ -48,11 +48,23 @@ def download_instagram_thumbnails(bundle, assets_dir):
         media_id = post.get("mediaId")
         thumb_url = post.pop("thumbUrl", None)
         if not media_id:
+            post["thumb"] = ""
             continue
         dest_name = f"{media_id}.jpg"
         dest_path = os.path.join(assets_dir, dest_name)
         if not os.path.exists(dest_path) and thumb_url:
-            download_binary(thumb_url, dest_path)
+            # Instagram media URLs are short-lived signed URLs, so a single 403 is
+            # plausible. Never let one bad thumbnail sink the whole Instagram bundle.
+            try:
+                download_binary(thumb_url, dest_path)
+            except Exception as e:
+                print(f"[Instagram] thumbnail download FAILED for {media_id}: {e}")
+                # Drop any partial file so a later run retries instead of
+                # serving a truncated image forever.
+                if os.path.exists(dest_path):
+                    os.remove(dest_path)
+                post["thumb"] = ""
+                continue
         post["thumb"] = f"assets/{dest_name}"
     return bundle
 
@@ -91,7 +103,7 @@ def build(channel_cfgs=None, channel_fetcher=fetch_channel_bundle,
         return False
 
     payload = {
-        "generatedAt": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "generatedAt": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "channels": channels_data,
     }
 
@@ -104,4 +116,5 @@ def build(channel_cfgs=None, channel_fetcher=fetch_channel_bundle,
 
 
 if __name__ == "__main__":
-    build()
+    # Exit non-zero when nothing was published so a fully-failed CI run goes red.
+    raise SystemExit(0 if build() else 1)
