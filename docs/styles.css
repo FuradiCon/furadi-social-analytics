@@ -320,7 +320,7 @@ img{ max-width: 100%; display: block; }
 }
 
 /* ---- comments ---- */
-.comment-list{ display: grid; gap: var(--s2); }
+.comment-list{ display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s3); }
 .comment-item{
   display: flex; gap: var(--s3);
   background: var(--surface-translucent);
@@ -624,6 +624,7 @@ tr.peak td:first-child{ box-shadow: inset 2px 0 0 var(--accent); }
   .card{ padding: var(--s4); }
   .viewall-channel{ padding: var(--s4); }
   .video-grid{ grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .comment-list{ grid-template-columns: 1fr; }
   .tabs{ overflow-x: auto; flex-wrap: nowrap; }
   .tab-btn{ white-space: nowrap; }
 }
