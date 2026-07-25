@@ -1,13 +1,21 @@
 import datetime
 import json
 import os
+import sys
 import urllib.request
+
+# Ensure the project root (parent of this scripts/ dir) is importable so
+# `python scripts/build_data.py` works the same as `python -m scripts.build_data`.
+# Running a script by path only puts its own directory on sys.path, which
+# breaks the `scripts.*` package imports below unless we add the root here.
+SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
 
 from scripts.datawindow import window_dates, prior_window_dates
 from scripts.youtube_pipeline import fetch_channel_bundle
 from scripts.instagram_pipeline import fetch_instagram_bundle
 
-SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_OUT_DIR = os.path.join(SCRIPT_DIR, "docs")
 
 CHANNEL_CFGS = [
