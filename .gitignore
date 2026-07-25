@@ -1,0 +1,8 @@
+token_*.json
+instagram_token.json
+instagram_client_secret.json
+__pycache__/
+*.pyc
+.pytest_cache/
+docs/assets/*
+!docs/assets/.gitkeep
