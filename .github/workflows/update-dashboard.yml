@@ -1,0 +1,46 @@
+name: Update dashboard
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GH_SECRETS_PAT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Write credential files
+        run: |
+          echo '${{ secrets.YT_TOKEN_GROUP_A }}' > token_group_a_furadride.json
+          echo '${{ secrets.YT_TOKEN_GROUP_B }}' > token_group_b_furadi_desertworks.json
+          echo '${{ secrets.YT_TOKEN_GROUP_C }}' > token_group_c_furadigames.json
+          echo '${{ secrets.INSTAGRAM_TOKEN }}' > instagram_token.json
+          echo '${{ secrets.INSTAGRAM_CLIENT_SECRET }}' > instagram_client_secret.json
+
+      - name: Run tests
+        run: pytest
+
+      - name: Build dashboard data
+        run: python scripts/build_data.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/data.json docs/assets
+          git diff --cached --quiet || git commit -m "Update dashboard data $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push
