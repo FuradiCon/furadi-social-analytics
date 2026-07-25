@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Furadi · Social Analytics</title>
+<meta name="description" content="Daily performance across Furadi's YouTube channels and Instagram." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2312161C'/%3E%3Cpath d='M2 11 L5 8 L8 9.5 L11 4.5 L14 6.5' fill='none' stroke='%23FF5A00' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<a class="skip-link" href="#stage">Skip to dashboard</a>
+
+<div class="app">
+
+  <!-- ── Signature element: the channel rail. Each account is a stacked
+       terrain-profile trace drawn in its own accent, so the whole portfolio
+       reads at a glance and doubles as the navigation. ── -->
+  <aside class="rail">
+    <div class="rail-inner">
+      <div class="rail-brand">
+        <span class="rail-mark" aria-hidden="true"></span>
+        <span class="rail-brand-text">
+          <b>Furadi</b>
+          <span>Social analytics</span>
+        </span>
+      </div>
+
+      <p class="rail-label">Accounts</p>
+      <nav class="channel-tabs" id="channelTabs" role="tablist" aria-label="Accounts"></nav>
+
+      <p class="rail-foot">
+        Last built<br />
+        <span class="mono" id="generatedAt">—</span>
+      </p>
+    </div>
+  </aside>
+
+  <main class="stage" id="stage">
+
+    <div id="singleChannelWrap">
+      <header class="page-head">
+        <div class="page-head-main">
+          <p class="eyebrow"></p>
+          <h1>Daily performance<span class="comment-alert" id="commentAlert" title="Comments" role="img" aria-label="Comments">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>
+          </span></h1>
+        </div>
+        <div class="date-range"></div>
+      </header>
+
+      <section class="kpi-grid" id="kpiGrid" aria-label="Key figures"></section>
+
+      <section class="block" id="commentsSection" hidden>
+        <p class="section-label">Recent comments <span class="hint">latest 4</span></p>
+        <div class="comment-list" id="commentList"></div>
+      </section>
+
+      <section class="block" id="topVideosSection" hidden>
+        <p class="section-label">Top videos <span class="hint">this period</span></p>
+        <div class="video-grid" id="videoGrid"></div>
+      </section>
+
+      <div class="tabs" role="tablist" aria-label="Analytics sections">
+        <button class="tab-btn" type="button" role="tab" data-tab="views" aria-selected="true" aria-controls="panel-views">Views &amp; watch time</button>
+        <button class="tab-btn" type="button" role="tab" data-tab="engagement" aria-selected="false" aria-controls="panel-engagement">Engagement</button>
+        <button class="tab-btn" type="button" role="tab" data-tab="subscribers" aria-selected="false" aria-controls="panel-subscribers">Subscribers</button>
+        <button class="tab-btn" type="button" role="tab" data-tab="log" aria-selected="false" aria-controls="panel-log">Daily log</button>
+      </div>
+
+      <section class="panel active" id="panel-views" role="tabpanel" tabindex="-1">
+        <div class="card">
+          <div class="card-title"><h2>Views</h2><span class="hint">peak marked</span></div>
+          <div class="chart-wrap" id="chart-views"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><h2>Estimated watch time</h2><span class="hint">minutes</span></div>
+          <div class="chart-wrap" id="chart-minutes"></div>
+        </div>
+        <div class="card card-table">
+          <div class="table-scroll">
+            <table id="table-views">
+              <thead><tr><th>Day</th><th class="num">Views</th><th class="num">Watch min</th><th class="num">Avg duration</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-engagement" role="tabpanel" tabindex="-1">
+        <div class="card">
+          <div class="card-title"><h2>Likes, comments &amp; shares</h2></div>
+          <div class="legend">
+            <span><i class="swatch" style="background:var(--accent)"></i>Likes</span>
+            <span><i class="swatch" style="background:var(--grey-bar-strong)"></i>Comments</span>
+            <span><i class="swatch" style="background:var(--grey-bar)"></i>Shares</span>
+          </div>
+          <div class="chart-wrap" id="chart-engagement"></div>
+        </div>
+        <div class="card card-table">
+          <div class="table-scroll">
+            <table id="table-engagement">
+              <thead><tr><th>Day</th><th class="num">Likes</th><th class="num">Comments</th><th class="num">Shares</th><th class="num">Total</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-subscribers" role="tabpanel" tabindex="-1">
+        <div class="card">
+          <div class="card-title"><h2>Gained vs. lost</h2><span class="hint" id="subNet"></span></div>
+          <div class="legend">
+            <span><i class="swatch" style="background:var(--accent)"></i>Gained</span>
+            <span><i class="swatch" style="background:var(--grey-bar-strong)"></i>Lost</span>
+          </div>
+          <div class="chart-wrap" id="chart-subs"></div>
+        </div>
+        <div class="card card-table">
+          <div class="table-scroll">
+            <table id="table-subs">
+              <thead><tr><th>Day</th><th class="num">Gained</th><th class="num">Lost</th><th class="num">Net</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-log" role="tabpanel" tabindex="-1">
+        <div class="card card-table">
+          <div class="card-title"><h2>Full daily log</h2><span class="hint" id="logRowCount"></span></div>
+          <div class="table-scroll">
+            <table id="table-log">
+              <thead><tr><th>Day</th><th class="num">Views</th><th class="num">Watch min</th><th class="num">Avg dur.</th><th class="num">Sub +</th><th class="num">Sub −</th><th class="num">Likes</th><th class="num">Comm.</th><th class="num">Shares</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="viewAllWrap" hidden></div>
+
+    <footer class="page-foot">
+      <p class="source"></p>
+      <p class="note">Built from the YouTube Analytics API (per channel, day dimension) and the Instagram Graph API. Rebuilt on every pipeline run.</p>
+    </footer>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
