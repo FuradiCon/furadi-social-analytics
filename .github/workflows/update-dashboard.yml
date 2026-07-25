@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: update-dashboard
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest

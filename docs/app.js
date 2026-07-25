@@ -13,7 +13,8 @@ const IG_ACCENT = { accent: '#FF2D95', accentStrong: '#FFA6D3', accentSoft: '#4A
 function fmtInt(n){ return Number(n || 0).toLocaleString('en-US'); }
 function fmtDay(d){ const dt = new Date(d + 'T00:00:00'); return dt.toLocaleDateString('en-US', { month:'short', day:'numeric' }); }
 function fmtDur(s){ const m = Math.floor(s/60), sec = Math.round(s%60); return m + ':' + String(sec).padStart(2,'0'); }
-function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+// Escapes &, <, > via textContent, then quotes — output is also used in attribute position.
+function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function timeAgo(iso){
   const diffSec = Math.floor((Date.now() - new Date(iso).getTime())/1000);
   if(diffSec < 60) return 'just now';
@@ -335,7 +336,6 @@ function renderStackedBars(containerId, rows){
   <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Engagement per day">${grid}${bars}${xlabels}</svg>
   <div class="tooltip" role="status"></div>`;
 
-  const svgEl = el.querySelector('svg');
   const tip = el.querySelector('.tooltip');
   el.querySelectorAll('.bar').forEach(bar => {
     bar.addEventListener('mousemove', () => {
@@ -347,7 +347,6 @@ function renderStackedBars(containerId, rows){
     });
     bar.addEventListener('mouseleave', () => tip.classList.remove('show'));
   });
-  void svgEl;
 }
 
 /* ---------- Diverging bars (subscribers) ---------- */
@@ -630,7 +629,6 @@ async function init(){
   }
 
   CHANNELS = payload.channels || [];
-  window.CHANNELS = CHANNELS;
   // Charts read oldest → newest, left to right; tables list newest first.
   CHANNELS.forEach(ch => { ch.tableRows = ch.data ? [...ch.data].reverse() : []; });
 
