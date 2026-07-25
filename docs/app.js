@@ -588,14 +588,14 @@ function railItemHtml(ch, idx){
 function buildRail(){
   const el = document.getElementById('channelTabs');
   el.innerHTML =
-    `<button class="channel-tab-btn rail-all" type="button" role="tab" data-idx="all" aria-selected="true">
+    CHANNELS.map(railItemHtml).join('') +
+    `<button class="channel-tab-btn rail-all" type="button" role="tab" data-idx="all" aria-selected="false">
        <span class="rail-row">
          <span class="channel-dot dot-all" aria-hidden="true" style="background:conic-gradient(${CHANNELS.map(c => accentOf(c).accent).join(',')},${accentOf(CHANNELS[0]).accent})"></span>
          <span class="rail-name">All accounts</span>
        </span>
        <span class="rail-metric">${CHANNELS.length} connected</span>
-     </button>` +
-    CHANNELS.map(railItemHtml).join('');
+     </button>`;
 
   el.querySelectorAll('.channel-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -615,6 +615,87 @@ function wireTabs(){
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
     });
   });
+}
+
+/* ---------- Animated particle-network background ----------
+   Drifting dots, connected by lines when close enough — colour-matched to
+   whichever channel is active by reading --accent live off the root element
+   each frame, so switching tabs recolors the field for free (applyAccent()
+   already sets it; nothing here needs to know which channel is showing).
+   Falls back to a single static frame under prefers-reduced-motion. */
+function initBackground(){
+  const canvas = document.getElementById('bgCanvas');
+  if(!canvas || !canvas.getContext) return;
+  const ctx = canvas.getContext('2d');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MAX_LINK_DIST = 140;
+  let w = 0, h = 0, particles = [];
+
+  function accentRgb(){
+    const hex = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#8B93A0';
+    const clean = hex.replace('#', '');
+    const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
+    const n = parseInt(full, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+
+  function resize(){
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+    const count = Math.min(90, Math.max(36, Math.round((w * h) / 16000)));
+    particles = Array.from({ length: count }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      r: 1.1 + Math.random() * 1.4
+    }));
+  }
+
+  function draw(){
+    const [cr, cg, cb] = accentRgb();
+    ctx.clearRect(0, 0, w, h);
+
+    for(const p of particles){
+      p.x += p.vx; p.y += p.vy;
+      if(p.x <= 0 || p.x >= w) p.vx *= -1;
+      if(p.y <= 0 || p.y >= h) p.vy *= -1;
+      p.x = Math.min(Math.max(p.x, 0), w);
+      p.y = Math.min(Math.max(p.y, 0), h);
+    }
+
+    for(let i = 0; i < particles.length; i++){
+      for(let j = i + 1; j < particles.length; j++){
+        const a = particles[i], b = particles[j];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        if(dist < MAX_LINK_DIST){
+          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${((1 - dist / MAX_LINK_DIST) * 0.32).toFixed(3)})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.fillStyle = `rgba(${cr},${cg},${cb},0.55)`;
+    for(const p of particles){
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function loop(){
+    draw();
+    if(!reduced) requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', () => {
+    resize();
+    if(reduced) draw();   // no running rAF loop to pick up the new size on its own
+  });
+  resize();
+  loop();
 }
 
 /* ---------- Boot ---------- */
@@ -638,10 +719,10 @@ async function init(){
   document.getElementById('generatedAt').textContent = payload.generatedAt || '—';
   buildRail();
   wireTabs();
-  renderViewAll();
+  renderChannel(0);   // default: first channel (Furad Ride), not the all-accounts view
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => { initBackground(); init(); });
 
 // Pick up the next scheduled pipeline run without a manual reload.
 setTimeout(() => location.reload(), 60 * 60 * 1000);
