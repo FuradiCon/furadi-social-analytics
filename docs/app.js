@@ -558,6 +558,8 @@ function sparklinePath(rows, key, w, h){
   return { line, area: `${line} L${w},${h} L0,${h} Z` };
 }
 
+const MAIL_ICON_PATH = '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/>';
+
 function railItemHtml(ch, idx){
   const a = accentOf(ch);
   const rows = ch.data || [];
@@ -574,11 +576,19 @@ function railItemHtml(ch, idx){
         <path d="${p.line}" fill="none" stroke="${a.accent}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
       </svg>`;
   }
+  // Instagram doesn't carry a hasNewComments flag (see instagram_pipeline.py) --
+  // only show the reply-status indicator for the YouTube channels.
+  const hasNew = !!ch.hasNewComments;
+  const alertHtml = isIG(ch) ? '' : `
+    <span class="rail-alert${hasNew ? ' flag' : ''}" aria-hidden="true" title="${hasNew ? 'A comment is awaiting a reply' : 'Comments'}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${MAIL_ICON_PATH}</svg>
+    </span>`;
   return `
     <button class="channel-tab-btn" type="button" role="tab" data-idx="${idx}" aria-selected="false" style="${accentVarsStyle(a)}">
       <span class="rail-row">
         <span class="channel-dot" aria-hidden="true"></span>
         <span class="rail-name">${escapeHtml(ch.name)}</span>
+        ${alertHtml}
       </span>
       <span class="rail-metric">${metric}</span>
       ${spark}
