@@ -13,6 +13,7 @@ const IG_ACCENT = { accent: '#FF2D95', accentStrong: '#FFA6D3', accentSoft: '#4A
 function fmtInt(n){ return Number(n || 0).toLocaleString('en-US'); }
 function fmtDay(d){ const dt = new Date(d + 'T00:00:00'); return dt.toLocaleDateString('en-US', { month:'short', day:'numeric' }); }
 function fmtDur(s){ const m = Math.floor(s/60), sec = Math.round(s%60); return m + ':' + String(sec).padStart(2,'0'); }
+function fmtUsd(n){ return '$' + Number(n || 0).toFixed(2); }
 // Escapes &, <, > via textContent, then quotes — output is also used in attribute position.
 function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function timeAgo(iso){
@@ -80,12 +81,14 @@ function kpiItemsHtml(ch, forViewAll){
     const totalUniques = rows.reduce((s,r) => s + (r.uniques || 0), 0);
     const avgViews = totalViews / rows.length;
     const best = rows.reduce((a,b) => b.views > a.views ? b : a, rows[0]);
+    const totalCost = rows.reduce((s,r) => s + (r.costUsd || 0), 0);
     const prior = ch.prior;
     return kpiCardsHtml([
       { label:'Page views',      value: fmtInt(totalViews),           sub:'across ' + rows.length + ' days', delta: pctDeltaHtml(totalViews, prior && prior.views) },
       { label:'Unique visitors', value: fmtInt(totalUniques),         sub:'across ' + rows.length + ' days', delta: pctDeltaHtml(totalUniques, prior && prior.uniques) },
       { label:'Daily average',   value: fmtInt(Math.round(avgViews)), sub:'views per day' },
-      { label:'Best day',        value: fmtInt(best.views),           sub: fmtDay(best.d) }
+      { label:'Best day',        value: fmtInt(best.views),           sub: fmtDay(best.d) },
+      { label:'API cost',        value: fmtUsd(totalCost),            sub:'estimated, ' + rows.length + ' days' }
     ]);
   }
 
@@ -229,6 +232,22 @@ function renderComments(ch){
   section.hidden = false;
 }
 
+/* ---------- Simple-channel secondary chart (e.g. Steadfast Counter's daily API cost) ---------- */
+function renderSimpleChart(ch){
+  const section = document.getElementById('simpleChartSection');
+  const rows = (ch.data || []).filter(r => typeof r.costUsd === 'number');
+  if(!isTraffic(ch) || !rows.length){ section.hidden = true; return; }
+
+  document.getElementById('simpleChartTitle').textContent = 'Anthropic API cost';
+  document.getElementById('simpleChartHint').textContent = 'estimated, per day';
+  renderAreaChart('chart-simple', rows, 'costUsd', {
+    color: accentOf(ch).accent,
+    unit: 'estimated cost',
+    formatValue: fmtUsd,
+  });
+  section.hidden = false;
+}
+
 /* ---------- Line / area chart ---------- */
 function renderAreaChart(containerId, rows, key, opts = {}){
   const el = document.getElementById(containerId);
@@ -242,6 +261,7 @@ function renderAreaChart(containerId, rows, key, opts = {}){
   const x = i => padL + (rows.length > 1 ? (i/(rows.length - 1)) * innerW : innerW/2);
   const y = v => padT + innerH - (v/maxV) * innerH;
   const color = opts.color || 'var(--accent)';
+  const fmtValue = opts.formatValue || fmtInt;
   const gid = 'grad-' + containerId;
 
   const line = rows.map((r,i) => (i === 0 ? 'M' : 'L') + x(i).toFixed(1) + ',' + y(r[key]).toFixed(1)).join(' ');
@@ -252,7 +272,7 @@ function renderAreaChart(containerId, rows, key, opts = {}){
     const v = maxV * t / ticks;
     const gy = y(v);
     grid += `<line x1="${padL}" x2="${W - padR}" y1="${gy.toFixed(1)}" y2="${gy.toFixed(1)}" stroke="var(--${t === 0 ? 'border-strong' : 'border'})" stroke-width="1" />`;
-    grid += `<text x="${padL - 10}" y="${(gy + 3.5).toFixed(1)}" text-anchor="end" class="axis-text">${fmtInt(Math.round(v))}</text>`;
+    grid += `<text x="${padL - 10}" y="${(gy + 3.5).toFixed(1)}" text-anchor="end" class="axis-text">${fmtValue(v)}</text>`;
   }
 
   let xlabels = '';
@@ -266,7 +286,7 @@ function renderAreaChart(containerId, rows, key, opts = {}){
   const peakEl = opts.markPeak ? `
     <line x1="${x(peakIdx).toFixed(1)}" x2="${x(peakIdx).toFixed(1)}" y1="${y(vals[peakIdx]).toFixed(1)}" y2="${(padT + innerH).toFixed(1)}" stroke="${color}" stroke-width="1" stroke-dasharray="2,3" opacity="0.5"/>
     <circle cx="${x(peakIdx).toFixed(1)}" cy="${y(vals[peakIdx]).toFixed(1)}" r="4" fill="${color}" stroke="var(--surface)" stroke-width="2"/>
-    <text x="${x(peakIdx).toFixed(1)}" y="${(y(vals[peakIdx]) - 11).toFixed(1)}" text-anchor="middle" class="peak-text">${fmtDay(rows[peakIdx].d)} · ${fmtInt(vals[peakIdx])}</text>
+    <text x="${x(peakIdx).toFixed(1)}" y="${(y(vals[peakIdx]) - 11).toFixed(1)}" text-anchor="middle" class="peak-text">${fmtDay(rows[peakIdx].d)} · ${fmtValue(vals[peakIdx])}</text>
   ` : '';
 
   el.innerHTML = `
@@ -304,7 +324,7 @@ function renderAreaChart(containerId, rows, key, opts = {}){
     tip.classList.add('show');
     tip.style.left = (cx/W*100) + '%';
     tip.style.top  = (cy/H*100) + '%';
-    tip.innerHTML = `${fmtDay(rows[idx].d)}<br><b>${fmtInt(vals[idx])}</b> ${escapeHtml(opts.unit || '')}`;
+    tip.innerHTML = `${fmtDay(rows[idx].d)}<br><b>${fmtValue(vals[idx])}</b> ${escapeHtml(opts.unit || '')}`;
   });
   el.querySelector('.hover-target').addEventListener('mouseleave', () => {
     guide.setAttribute('opacity','0'); dot.setAttribute('opacity','0'); tip.classList.remove('show');
@@ -517,6 +537,7 @@ function renderChannel(idx){
   renderKPIs(ch);
   renderTopVideos(ch);
   renderComments(ch);
+  renderSimpleChart(ch);
 
   document.querySelector('.tabs').hidden = simple;
   document.querySelectorAll('.panel').forEach(p => { p.hidden = simple; });
