@@ -28,6 +28,7 @@ function timeAgo(iso){
 }
 function plural(n, word){ return fmtInt(n) + ' ' + word + (Math.abs(n) === 1 ? '' : 's'); }
 function isIG(ch){ return ch.platform === 'instagram'; }
+function isTraffic(ch){ return ch.kind === 'traffic'; }
 function accentOf(ch){ return ch.accent || IG_ACCENT; }
 
 /* Rounds an axis maximum up so that `ticks` evenly spaced gridlines all land on
@@ -72,6 +73,22 @@ function kpiCardsHtml(items){
 }
 
 function kpiItemsHtml(ch, forViewAll){
+  if(isTraffic(ch)){
+    const rows = ch.data || [];
+    if(!rows.length) return null;
+    const totalViews = rows.reduce((s,r) => s + r.views, 0);
+    const totalUniques = rows.reduce((s,r) => s + (r.uniques || 0), 0);
+    const avgViews = totalViews / rows.length;
+    const best = rows.reduce((a,b) => b.views > a.views ? b : a, rows[0]);
+    const prior = ch.prior;
+    return kpiCardsHtml([
+      { label:'Page views',      value: fmtInt(totalViews),           sub:'across ' + rows.length + ' days', delta: pctDeltaHtml(totalViews, prior && prior.views) },
+      { label:'Unique visitors', value: fmtInt(totalUniques),         sub:'across ' + rows.length + ' days', delta: pctDeltaHtml(totalUniques, prior && prior.uniques) },
+      { label:'Daily average',   value: fmtInt(Math.round(avgViews)), sub:'views per day' },
+      { label:'Best day',        value: fmtInt(best.views),           sub: fmtDay(best.d) }
+    ]);
+  }
+
   if(isIG(ch)){
     const t = ch.totals || { posts:0, likes:0, comments:0 };
     const p = ch.priorTotals;
@@ -475,33 +492,36 @@ function renderChannel(idx){
   showSingle();
   const ch = CHANNELS[idx];
   const ig = isIG(ch);
+  const traffic = isTraffic(ch);
+  const simple = ig || traffic;
   applyAccent(accentOf(ch));
 
   document.querySelector('.eyebrow').textContent = ch.name;
   document.querySelector('.date-range').textContent = ch.dateRangeIso || 'No data yet';
-  // Instagram ships period totals, not a daily series — don't promise a daily view.
-  document.querySelector('.page-head h1').firstChild.nodeValue = ig ? 'Account performance' : 'Daily performance';
+  // Instagram ships period totals and traffic ships page views, neither is a
+  // per-video daily series — don't promise a "Daily performance" view for them.
+  document.querySelector('.page-head h1').firstChild.nodeValue = ig ? 'Account performance' : traffic ? 'Page performance' : 'Daily performance';
 
   const alertEl = document.getElementById('commentAlert');
-  const hasNew = !ig && !!ch.hasNewComments;
-  alertEl.classList.toggle('shown', !ig);
+  const hasNew = !simple && !!ch.hasNewComments;
+  alertEl.classList.toggle('shown', !simple);
   alertEl.classList.toggle('flag', hasNew);
   const alertLabel = hasNew ? 'A comment is awaiting a reply' : 'Comments';
   alertEl.title = alertLabel;
   alertEl.setAttribute('aria-label', alertLabel);
 
   document.querySelector('.source').textContent = ch.dateRangeIso
-    ? (ig ? 'instagram_analytics · ' : 'youtube_analytics · ') + ch.dateRangeIso
+    ? (ig ? 'instagram_analytics · ' : traffic ? 'github_traffic · ' : 'youtube_analytics · ') + ch.dateRangeIso
     : '';
 
   renderKPIs(ch);
   renderTopVideos(ch);
   renderComments(ch);
 
-  document.querySelector('.tabs').hidden = ig;
-  document.querySelectorAll('.panel').forEach(p => { p.hidden = ig; });
+  document.querySelector('.tabs').hidden = simple;
+  document.querySelectorAll('.panel').forEach(p => { p.hidden = simple; });
 
-  if(!ig){ renderCharts(ch); renderTables(ch); }
+  if(!simple){ renderCharts(ch); renderTables(ch); }
   syncRail();
   document.getElementById('stage').scrollTo?.({ top: 0 });
   window.scrollTo({ top: 0, behavior: 'auto' });
@@ -511,7 +531,7 @@ function renderChannel(idx){
 function renderViewAll(){
   activeIdx = 'all';
   showAll();
-  document.querySelector('.source').textContent = 'youtube_analytics + instagram_analytics · all accounts';
+  document.querySelector('.source').textContent = 'github_traffic + youtube_analytics + instagram_analytics · all accounts';
 
   const wrap = document.getElementById('viewAllWrap');
   wrap.innerHTML = CHANNELS.map((ch,i) => {
@@ -576,10 +596,10 @@ function railItemHtml(ch, idx){
         <path d="${p.line}" fill="none" stroke="${a.accent}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
       </svg>`;
   }
-  // Instagram doesn't carry a hasNewComments flag (see instagram_pipeline.py) --
+  // Instagram and traffic-only channels don't carry a hasNewComments flag --
   // only show the reply-status indicator for the YouTube channels.
   const hasNew = !!ch.hasNewComments;
-  const alertHtml = isIG(ch) ? '' : `
+  const alertHtml = (isIG(ch) || isTraffic(ch)) ? '' : `
     <span class="rail-alert${hasNew ? ' flag' : ''}" aria-hidden="true" title="${hasNew ? 'A comment is awaiting a reply' : 'Comments'}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${MAIL_ICON_PATH}</svg>
     </span>`;

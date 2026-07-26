@@ -15,6 +15,7 @@ if SCRIPT_DIR not in sys.path:
 from scripts.datawindow import window_dates, prior_window_dates
 from scripts.youtube_pipeline import fetch_channel_bundle
 from scripts.instagram_pipeline import fetch_instagram_bundle
+from scripts.steadfast_pipeline import fetch_steadfast_bundle
 
 DEFAULT_OUT_DIR = os.path.join(SCRIPT_DIR, "docs")
 
@@ -70,7 +71,8 @@ def download_instagram_thumbnails(bundle, assets_dir):
 
 
 def build(channel_cfgs=None, channel_fetcher=fetch_channel_bundle,
-          instagram_fetcher=fetch_instagram_bundle, out_dir=None):
+          instagram_fetcher=fetch_instagram_bundle,
+          steadfast_fetcher=fetch_steadfast_bundle, out_dir=None):
     channel_cfgs = channel_cfgs if channel_cfgs is not None else CHANNEL_CFGS
     out_dir = out_dir or DEFAULT_OUT_DIR
     assets_dir = os.path.join(out_dir, "assets")
@@ -81,6 +83,16 @@ def build(channel_cfgs=None, channel_fetcher=fetch_channel_bundle,
 
     channels_data = []
     any_success = False
+
+    # Steadfast Counter is prepended first so it renders at the top of the
+    # rail, above the YouTube channels — it tracks a separate site's page
+    # traffic, not a YouTube/Instagram account, so a fetch failure here must
+    # never sink the rest of the dashboard build.
+    try:
+        channels_data.append(steadfast_fetcher())
+        any_success = True
+    except Exception as e:
+        print(f"[Steadfast Counter] FAILED: {e}")
 
     for cfg in channel_cfgs:
         try:

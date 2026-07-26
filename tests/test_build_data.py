@@ -14,6 +14,13 @@ def _failing_bundle(cfg, *args):
     raise RuntimeError("API down")
 
 
+def _failing_steadfast():
+    # Most tests here aren't exercising the Steadfast Counter feature, so keep
+    # them deterministic and network-free by having it fail like a real
+    # "traffic.json not published yet" case — build() must tolerate that.
+    raise RuntimeError("traffic.json not available")
+
+
 def test_build_writes_data_json_with_channels_and_instagram(tmp_path):
     def fake_instagram_fetcher(*a, **kw):
         return {"slug": "instagram", "platform": "instagram", "topVideos": []}
@@ -22,6 +29,7 @@ def test_build_writes_data_json_with_channels_and_instagram(tmp_path):
         channel_cfgs=CHANNEL_CFGS,
         channel_fetcher=_good_bundle,
         instagram_fetcher=fake_instagram_fetcher,
+        steadfast_fetcher=_failing_steadfast,
         out_dir=str(tmp_path),
     )
 
@@ -40,6 +48,7 @@ def test_build_skips_publish_when_every_channel_and_instagram_fail(tmp_path):
         channel_cfgs=CHANNEL_CFGS,
         channel_fetcher=_failing_bundle,
         instagram_fetcher=fake_instagram_fetcher,
+        steadfast_fetcher=_failing_steadfast,
         out_dir=str(tmp_path),
     )
 
@@ -62,6 +71,7 @@ def test_build_continues_when_one_channel_fails(tmp_path):
         channel_cfgs=two_channels,
         channel_fetcher=flaky_fetcher,
         instagram_fetcher=lambda *a, **kw: {"slug": "instagram", "platform": "instagram", "topVideos": []},
+        steadfast_fetcher=_failing_steadfast,
         out_dir=str(tmp_path),
     )
 
@@ -69,6 +79,40 @@ def test_build_continues_when_one_channel_fails(tmp_path):
     data = json.loads((tmp_path / "data.json").read_text())
     slugs = [c["slug"] for c in data["channels"]]
     assert "furadi" in slugs
+
+
+def test_build_puts_steadfast_counter_first_when_available(tmp_path):
+    def fake_steadfast():
+        return {"slug": "steadfast-counter", "kind": "traffic", "data": [{"d": "2026-07-01", "views": 5}]}
+
+    published = build(
+        channel_cfgs=CHANNEL_CFGS,
+        channel_fetcher=_good_bundle,
+        instagram_fetcher=lambda *a, **kw: {"slug": "instagram", "platform": "instagram", "topVideos": []},
+        steadfast_fetcher=fake_steadfast,
+        out_dir=str(tmp_path),
+    )
+
+    assert published is True
+    data = json.loads((tmp_path / "data.json").read_text())
+    assert data["channels"][0]["slug"] == "steadfast-counter"
+    assert data["channels"][1]["slug"] == "furad-ride"
+
+
+def test_build_continues_when_steadfast_counter_fails(tmp_path):
+    published = build(
+        channel_cfgs=CHANNEL_CFGS,
+        channel_fetcher=_good_bundle,
+        instagram_fetcher=lambda *a, **kw: {"slug": "instagram", "platform": "instagram", "topVideos": []},
+        steadfast_fetcher=_failing_steadfast,
+        out_dir=str(tmp_path),
+    )
+
+    assert published is True
+    data = json.loads((tmp_path / "data.json").read_text())
+    slugs = [c["slug"] for c in data["channels"]]
+    assert "steadfast-counter" not in slugs
+    assert data["channels"][0]["slug"] == "furad-ride"
 
 
 def test_download_instagram_thumbnails_skips_existing_file(tmp_path, monkeypatch):
