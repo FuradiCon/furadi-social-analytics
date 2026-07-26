@@ -627,6 +627,34 @@ function wireTabs(){
   });
 }
 
+/* ---------- Favicon comment-alert glow ----------
+   Same mark, two renders: the plain tab icon, and a version with a warm
+   radial wash + blurred underlay behind the checkmark so it reads as "lit up"
+   even at favicon size. Swapped in once at boot based on whether ANY channel
+   has an unanswered recent comment — this is deliberately account-agnostic,
+   so it doesn't use --accent (that's per-channel and changes with the tab). */
+function faviconSvg(glow){
+  const bg = glow
+    ? `<defs><radialGradient id='g' cx='50%' cy='45%' r='75%'>
+         <stop offset='0%' stop-color='#FF5A00' stop-opacity='.9'/>
+         <stop offset='55%' stop-color='#7A2E00' stop-opacity='.55'/>
+         <stop offset='100%' stop-color='#12161C'/>
+       </radialGradient></defs>
+       <rect width='16' height='16' rx='3' fill='url(#g)'/>`
+    : `<rect width='16' height='16' rx='3' fill='#12161C'/>`;
+  const glowStroke = glow
+    ? `<path d='M2 11 L5 8 L8 9.5 L11 4.5 L14 6.5' fill='none' stroke='#FF5A00' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' opacity='.55' filter='blur(.8px)'/>`
+    : '';
+  const strokeColor = glow ? '#FFD9B3' : '#FF5A00';
+  return `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'>${bg}${glowStroke}`
+    + `<path d='M2 11 L5 8 L8 9.5 L11 4.5 L14 6.5' fill='none' stroke='${strokeColor}' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>`;
+}
+function updateFavicon(anyNewComments){
+  const link = document.querySelector('link[rel="icon"]');
+  if(!link) return;
+  link.href = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg(anyNewComments));
+}
+
 /* ---------- Animated particle-network background ----------
    Drifting dots, connected by lines when close enough — colour-matched to
    whichever channel is active by reading --accent live off the root element
@@ -727,6 +755,7 @@ async function init(){
   CHANNELS.forEach(ch => { ch.tableRows = ch.data ? [...ch.data].reverse() : []; });
 
   document.getElementById('generatedAt').textContent = payload.generatedAt || '—';
+  updateFavicon(CHANNELS.some(ch => !!ch.hasNewComments));
   buildRail();
   wireTabs();
   renderChannel(0);   // default: first channel (Furad Ride), not the all-accounts view
