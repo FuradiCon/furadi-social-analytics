@@ -778,7 +778,10 @@ async function init(){
   updateFavicon(CHANNELS.some(ch => !!ch.hasNewComments));
   buildRail();
   wireTabs();
-  renderChannel(0);   // default: first channel (Furad Ride), not the all-accounts view
+  // Steadfast Counter sits first in the rail, but Furad Ride stays the
+  // default landing view — fall back to index 0 if it's ever missing.
+  const defaultIdx = Math.max(0, CHANNELS.findIndex(ch => ch.slug === 'furad-ride'));
+  renderChannel(defaultIdx);
 }
 
 document.addEventListener('DOMContentLoaded', () => { initBackground(); init(); });
