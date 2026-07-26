@@ -658,7 +658,7 @@ function initBackground(){
       y: Math.random() * h,
       vx: (Math.random() - 0.5) * 0.3,
       vy: (Math.random() - 0.5) * 0.3,
-      r: 1.1 + Math.random() * 1.4
+      r: 2.4 + Math.random() * 2.6
     }));
   }
 
@@ -680,7 +680,7 @@ function initBackground(){
         const dist = Math.hypot(a.x - b.x, a.y - b.y);
         if(dist < MAX_LINK_DIST){
           ctx.strokeStyle = `rgba(${cr},${cg},${cb},${((1 - dist / MAX_LINK_DIST) * 0.32).toFixed(3)})`;
-          ctx.lineWidth = 1;
+          ctx.lineWidth = 2.4;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
           ctx.stroke();
