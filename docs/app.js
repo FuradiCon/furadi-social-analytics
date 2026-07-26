@@ -735,4 +735,4 @@ async function init(){
 document.addEventListener('DOMContentLoaded', () => { initBackground(); init(); });
 
 // Pick up the next scheduled pipeline run without a manual reload.
-setTimeout(() => location.reload(), 60 * 60 * 1000);
+setTimeout(() => location.reload(), 20 * 60 * 1000);
