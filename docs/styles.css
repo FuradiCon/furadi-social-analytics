@@ -601,23 +601,22 @@ tr.peak td:first-child{ box-shadow: inset 2px 0 0 var(--accent); }
 /* ============================= responsive =============================== */
 @media (max-width: 1080px){
   .app{
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 220px minmax(0, 1fr);
     gap: var(--s5);
     padding: var(--s5) var(--s5) var(--s7);
   }
-  .rail-inner{ position: static; padding: var(--s4); }
-  .rail-label{ display: none; }
-  .channel-tabs{
-    flex-direction: row; overflow-x: auto;
-    gap: var(--s2); padding-bottom: var(--s1);
-  }
-  .channel-tab-btn{ flex: 0 0 190px; }
-  .rail-foot{ margin-top: var(--s4); }
+  .rail-inner{ padding: var(--s4); }
 }
 
 @media (max-width: 620px){
   body{ font-size: 14px; }
-  .app{ padding: var(--s4) var(--s4) var(--s6); gap: var(--s4); }
+  .app{
+    grid-template-columns: 152px minmax(0, 1fr);
+    padding: var(--s4) var(--s4) var(--s6); gap: var(--s3);
+  }
+  .rail-inner{ padding: var(--s3) var(--s2); }
+  .rail-brand{ padding: 0 var(--s1) var(--s4); }
+  .rail-name{ font-size: 13px; }
   .page-head{ align-items: flex-start; flex-direction: column; gap: var(--s3); }
   .kpi-grid{ grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
   .kpi-value{ font-size: 24px; }
