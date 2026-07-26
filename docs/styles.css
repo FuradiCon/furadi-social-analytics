@@ -605,7 +605,7 @@ tr.peak td:first-child{ box-shadow: inset 2px 0 0 var(--accent); }
     gap: var(--s5);
     padding: var(--s5) var(--s5) var(--s7);
   }
-  .rail-inner{ padding: var(--s4); }
+  .rail-inner{ padding: var(--s4); top: 0; }
 }
 
 @media (max-width: 620px){
