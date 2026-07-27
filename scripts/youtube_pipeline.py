@@ -41,7 +41,10 @@ def get_credentials(token_file):
                     f"Missing {CLIENT_SECRET_FILE} and no valid refresh token in {token_file}."
                 )
             flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
-            creds = flow.run_local_server(port=0)
+            # Force the Google account picker every time -- an already-logged-in
+            # browser session otherwise silently reuses whichever account is
+            # active, which can authorize the wrong channel's owner account.
+            creds = flow.run_local_server(port=0, prompt="select_account")
         with open(token_file, "w") as f:
             f.write(creds.to_json())
 
