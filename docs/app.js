@@ -696,51 +696,55 @@ function updateFavicon(anyNewComments){
   link.href = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg(anyNewComments));
 }
 
-/* ---------- Animated particle-network background ----------
-   Drifting dots, connected by lines when close enough — colour-matched to
-   whichever channel is active by reading --accent live off the root element
-   each frame, so switching tabs recolors the field for free (applyAccent()
-   already sets it; nothing here needs to know which channel is showing).
+/* ---------- Background manager ----------
+   A single shared canvas plus swappable renderers (particles, matrix — more
+   can be added to BACKGROUNDS without touching the switch logic). Each
+   renderer owns its own state and rAF loop via start()/stop()/resize();
+   setActiveBackground() stops whichever is running and starts the next.
+   Colour-matched to whichever channel is active by reading --accent live off
+   the root element each frame, so switching tabs recolors the field for free
+   (applyAccent() already sets it; renderers don't need to know the channel).
    Falls back to a single static frame under prefers-reduced-motion. */
-function initBackground(){
-  const canvas = document.getElementById('bgCanvas');
-  if(!canvas || !canvas.getContext) return;
-  const ctx = canvas.getContext('2d');
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const MAX_LINK_DIST = 140;
-  let w = 0, h = 0, particles = [];
+let bgCanvas, bgCtx, bgW = 0, bgH = 0;
+function bgReducedMotion(){ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+function bgAccentRgb(){
+  const hex = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#8B93A0';
+  const clean = hex.replace('#', '');
+  const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
+  const n = parseInt(full, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function bgResizeCanvas(){
+  bgW = bgCanvas.width = window.innerWidth;
+  bgH = bgCanvas.height = window.innerHeight;
+}
 
-  function accentRgb(){
-    const hex = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#8B93A0';
-    const clean = hex.replace('#', '');
-    const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
-    const n = parseInt(full, 16);
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  }
+/* ---- Particles: drifting dots, connected by lines when close enough ---- */
+const particlesRenderer = (() => {
+  const MAX_LINK_DIST = 280;
+  let particles = [], rafId = null;
 
-  function resize(){
-    w = canvas.width = window.innerWidth;
-    h = canvas.height = window.innerHeight;
-    const count = Math.min(90, Math.max(36, Math.round((w * h) / 16000)));
+  function reset(){
+    const count = Math.min(90, Math.max(36, Math.round((bgW * bgH) / 16000)));
     particles = Array.from({ length: count }, () => ({
-      x: Math.random() * w,
-      y: Math.random() * h,
-      vx: (Math.random() - 0.5) * 0.3,
-      vy: (Math.random() - 0.5) * 0.3,
-      r: 2.4 + Math.random() * 2.6
+      x: Math.random() * bgW,
+      y: Math.random() * bgH,
+      vx: (Math.random() - 0.5) * 0.6,
+      vy: (Math.random() - 0.5) * 0.6,
+      r: 1.6 + Math.random() * 1.6
     }));
   }
 
   function draw(){
-    const [cr, cg, cb] = accentRgb();
-    ctx.clearRect(0, 0, w, h);
+    const [cr, cg, cb] = bgAccentRgb();
+    bgCtx.clearRect(0, 0, bgW, bgH);
 
     for(const p of particles){
       p.x += p.vx; p.y += p.vy;
-      if(p.x <= 0 || p.x >= w) p.vx *= -1;
-      if(p.y <= 0 || p.y >= h) p.vy *= -1;
-      p.x = Math.min(Math.max(p.x, 0), w);
-      p.y = Math.min(Math.max(p.y, 0), h);
+      if(p.x <= 0 || p.x >= bgW) p.vx *= -1;
+      if(p.y <= 0 || p.y >= bgH) p.vy *= -1;
+      p.x = Math.min(Math.max(p.x, 0), bgW);
+      p.y = Math.min(Math.max(p.y, 0), bgH);
     }
 
     for(let i = 0; i < particles.length; i++){
@@ -748,33 +752,149 @@ function initBackground(){
         const a = particles[i], b = particles[j];
         const dist = Math.hypot(a.x - b.x, a.y - b.y);
         if(dist < MAX_LINK_DIST){
-          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${((1 - dist / MAX_LINK_DIST) * 0.32).toFixed(3)})`;
-          ctx.lineWidth = 2.4;
-          ctx.beginPath();
-          ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-          ctx.stroke();
+          bgCtx.strokeStyle = `rgba(${cr},${cg},${cb},${((1 - dist / MAX_LINK_DIST) * 0.32).toFixed(3)})`;
+          bgCtx.lineWidth = 3.6;
+          bgCtx.beginPath();
+          bgCtx.moveTo(a.x, a.y); bgCtx.lineTo(b.x, b.y);
+          bgCtx.stroke();
         }
       }
     }
-    ctx.fillStyle = `rgba(${cr},${cg},${cb},0.55)`;
+    bgCtx.fillStyle = `rgba(${cr},${cg},${cb},0.55)`;
     for(const p of particles){
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fill();
+      bgCtx.beginPath();
+      bgCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      bgCtx.fill();
     }
   }
 
   function loop(){
     draw();
-    if(!reduced) requestAnimationFrame(loop);
+    if(!bgReducedMotion()) rafId = requestAnimationFrame(loop);
   }
 
-  window.addEventListener('resize', () => {
-    resize();
-    if(reduced) draw();   // no running rAF loop to pick up the new size on its own
+  return {
+    id: 'particles', label: 'Particles',
+    start(){ reset(); loop(); },
+    stop(){ if(rafId != null) cancelAnimationFrame(rafId); rafId = null; },
+    resize(){ reset(); if(bgReducedMotion()) draw(); }
+  };
+})();
+
+/* ---- Matrix: dense falling-code rain, glowing leading characters ---- */
+const matrixRenderer = (() => {
+  const GLYPHS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789+-*/<>=';
+  const COL_SPACING = 15; // tight relative to glyph size so columns overlap into a wall
+  let columns = [], rafId = null;
+
+  function reset(){
+    const colCount = Math.ceil(bgW / COL_SPACING);
+    columns = Array.from({ length: colCount }, () => ({
+      y: Math.random() * -bgH,
+      speed: 1.5 + Math.random() * 2,
+      trail: 20 + Math.floor(Math.random() * 18),
+      fontSize: 20 + Math.random() * 30, // randomized per column, 20-50px
+      glyphs: [] // per-cell glyph, only rerolled occasionally so it doesn't flicker every frame
+    }));
+  }
+
+  function draw(){
+    const [cr, cg, cb] = bgAccentRgb();
+    bgCtx.fillStyle = 'rgba(0,0,0,0.10)'; // slow fade over solid-black ground = long, dense trails
+    bgCtx.fillRect(0, 0, bgW, bgH);
+    bgCtx.textBaseline = 'top';
+
+    columns.forEach((col, i) => {
+      const x = i * COL_SPACING;
+      bgCtx.font = col.fontSize.toFixed(1) + 'px "Consolas", monospace';
+      for(let t = 0; t < col.trail; t++){
+        const y = col.y - t * col.fontSize;
+        if(y < -col.fontSize || y > bgH) continue;
+        if(Math.random() < 0.08 || !col.glyphs[t]) col.glyphs[t] = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+        const glyph = col.glyphs[t];
+        if(t === 0){
+          bgCtx.shadowBlur = 16;
+          bgCtx.shadowColor = `rgb(${Math.min(255, cr + 180)},${Math.min(255, cg + 180)},${Math.min(255, cb + 180)})`;
+          bgCtx.fillStyle = `rgba(${Math.min(255, cr + 180)},${Math.min(255, cg + 180)},${Math.min(255, cb + 180)},1)`;
+        } else if(t === 1){
+          bgCtx.shadowBlur = 8;
+          bgCtx.shadowColor = `rgba(${cr},${cg},${cb},0.9)`;
+          bgCtx.fillStyle = `rgba(${Math.min(255, cr + 80)},${Math.min(255, cg + 80)},${Math.min(255, cb + 80)},0.95)`;
+        } else {
+          bgCtx.shadowBlur = 0;
+          const alpha = Math.max(0, (1 - t / col.trail)) * 0.9;
+          bgCtx.fillStyle = `rgba(${cr},${cg},${cb},${alpha.toFixed(3)})`;
+        }
+        bgCtx.fillText(glyph, x, y);
+      }
+      col.y += col.speed;
+      if(col.y - col.trail * col.fontSize > bgH) col.y = Math.random() * -200;
+    });
+    bgCtx.shadowBlur = 0;
+  }
+
+  function loop(){
+    draw();
+    if(!bgReducedMotion()) rafId = requestAnimationFrame(loop);
+  }
+
+  return {
+    id: 'matrix', label: 'Matrix',
+    start(){ reset(); loop(); },
+    stop(){ if(rafId != null) cancelAnimationFrame(rafId); rafId = null; },
+    resize(){ reset(); if(bgReducedMotion()) draw(); }
+  };
+})();
+
+const BACKGROUNDS = [particlesRenderer, matrixRenderer];
+const BG_STORAGE_KEY = 'furadi-bg';
+let activeBg = null;
+
+function setActiveBackground(id, { persist = true } = {}){
+  const next = BACKGROUNDS.find(b => b.id === id) || BACKGROUNDS[0];
+  if(activeBg) activeBg.stop();
+  activeBg = next;
+  bgCtx.clearRect(0, 0, bgW, bgH);
+  activeBg.start();
+  if(persist) localStorage.setItem(BG_STORAGE_KEY, activeBg.id);
+  document.querySelectorAll('.bg-switch-btn[data-bg]').forEach(btn => {
+    btn.setAttribute('aria-pressed', String(btn.dataset.bg === activeBg.id));
   });
-  resize();
-  loop();
+  document.body.classList.toggle('bg-matrix-active', activeBg.id === 'matrix');
+}
+
+function initBackground(){
+  bgCanvas = document.getElementById('bgCanvas');
+  if(!bgCanvas || !bgCanvas.getContext) return;
+  bgCtx = bgCanvas.getContext('2d');
+  bgResizeCanvas();
+  window.addEventListener('resize', () => {
+    bgResizeCanvas();
+    if(activeBg) activeBg.resize();
+  });
+  const saved = localStorage.getItem(BG_STORAGE_KEY);
+  const initial = BACKGROUNDS.some(b => b.id === saved) ? saved : BACKGROUNDS[0].id;
+  setActiveBackground(initial, { persist: false });
+}
+
+/* ---------- Background-only mode ----------
+   Hides the dashboard, leaving just the animated background full-screen.
+   Transient by design — never persisted, always starts visible on load — so
+   a small restore button stays on screen as the only way back. */
+function setBackgroundOnly(active){
+  document.body.classList.toggle('bg-only-mode', active);
+  const restoreBtn = document.getElementById('bgRestoreBtn');
+  if(restoreBtn) restoreBtn.hidden = !active;
+}
+
+function wireBackgroundControls(){
+  document.querySelectorAll('.bg-switch-btn[data-bg]').forEach(btn => {
+    btn.addEventListener('click', () => setActiveBackground(btn.dataset.bg));
+  });
+  const onlyBtn = document.getElementById('bgOnlyBtn');
+  const restoreBtn = document.getElementById('bgRestoreBtn');
+  if(onlyBtn) onlyBtn.addEventListener('click', () => setBackgroundOnly(true));
+  if(restoreBtn) restoreBtn.addEventListener('click', () => setBackgroundOnly(false));
 }
 
 /* ---------- Boot ---------- */
@@ -805,7 +925,7 @@ async function init(){
   renderChannel(defaultIdx);
 }
 
-document.addEventListener('DOMContentLoaded', () => { initBackground(); init(); });
+document.addEventListener('DOMContentLoaded', () => { initBackground(); wireBackgroundControls(); init(); });
 
 // Pick up the next scheduled pipeline run without a manual reload.
 setTimeout(() => location.reload(), 20 * 60 * 1000);

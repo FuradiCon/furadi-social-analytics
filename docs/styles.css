@@ -15,7 +15,7 @@
   --paper:              #1A1B1E;   /* page ground, under the network art       */
   --surface:            #2A2C31;   /* solid: chips, badges, sticky headers     */
   --surface-sunk:       #202125;   /* inset: table stripes, thumb wells        */
-  --surface-translucent:rgba(42,44,49,.32);  /* glass: cards, rail, tabs       */
+  --surface-translucent:rgba(42,44,49,.2);   /* glass: cards, rail, tabs       */
   --ink:                #F1F2F4;   /* near-white, warm-neutral                 */
   --text-secondary:     #9BA2AC;   /* labels, axes, captions                   */
   --border:             rgba(241,242,244,.10);   /* hairlines                 */
@@ -126,8 +126,8 @@ img{ max-width: 100%; display: block; }
 .rail-inner{
   position: sticky; top: var(--s7);
   background: var(--surface-translucent);
-  backdrop-filter: blur(34px) saturate(180%);
-  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  backdrop-filter: blur(17px) saturate(180%);
+  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-2);
@@ -241,6 +241,9 @@ img{ max-width: 100%; display: block; }
   padding: var(--s1) var(--s3);
   white-space: nowrap;
 }
+.page-head-controls{
+  display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
+}
 
 .comment-alert{
   display: none;
@@ -271,8 +274,8 @@ img{ max-width: 100%; display: block; }
 .kpi{
   position: relative;
   background: var(--surface-translucent);
-  backdrop-filter: blur(34px) saturate(180%);
-  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  backdrop-filter: blur(17px) saturate(180%);
+  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-1);
@@ -324,8 +327,8 @@ img{ max-width: 100%; display: block; }
 .comment-item{
   display: flex; gap: var(--s3);
   background: var(--surface-translucent);
-  backdrop-filter: blur(34px) saturate(180%);
-  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  backdrop-filter: blur(17px) saturate(180%);
+  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-left: 3px solid var(--border);
   border-radius: var(--r-md);
@@ -375,8 +378,8 @@ img{ max-width: 100%; display: block; }
 .video-card{
   display: flex; flex-direction: column;
   background: var(--surface-translucent);
-  backdrop-filter: blur(34px) saturate(180%);
-  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  backdrop-filter: blur(17px) saturate(180%);
+  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-1);
@@ -415,8 +418,8 @@ img{ max-width: 100%; display: block; }
 .tabs{
   display: flex; gap: var(--s1); flex-wrap: wrap;
   background: var(--surface-translucent);
-  backdrop-filter: blur(34px) saturate(180%);
-  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  backdrop-filter: blur(17px) saturate(180%);
+  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-1);
@@ -448,8 +451,8 @@ img{ max-width: 100%; display: block; }
 /* ============================== cards =================================== */
 .card{
   background: var(--surface-translucent);
-  backdrop-filter: blur(34px) saturate(180%);
-  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  backdrop-filter: blur(17px) saturate(180%);
+  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-2);
@@ -540,8 +543,8 @@ tr.peak td:first-child{ box-shadow: inset 2px 0 0 var(--accent); }
 #viewAllWrap{ display: grid; gap: var(--s6); }
 .viewall-channel{
   background: var(--surface-translucent);
-  backdrop-filter: blur(34px) saturate(180%);
-  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  backdrop-filter: blur(17px) saturate(180%);
+  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   border-radius: var(--r-lg);
@@ -580,6 +583,52 @@ tr.peak td:first-child{ box-shadow: inset 2px 0 0 var(--accent); }
 .load-error{ padding: var(--s8) 0; }
 .load-error h1{ font-size: 28px; margin-bottom: var(--s3); }
 .load-error p{ color: var(--text-secondary); max-width: 52ch; }
+
+/* ============================ background switcher ======================== */
+.bg-switch{
+  display: flex; gap: var(--s1); width: fit-content;
+  background: var(--surface-translucent);
+  backdrop-filter: blur(17px) saturate(180%);
+  -webkit-backdrop-filter: blur(17px) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s1);
+}
+.bg-switch-btn{
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; border-radius: var(--r-sm);
+  padding: var(--s2) var(--s4);
+  font-size: 13px; font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color .16s ease, background-color .16s ease, transform .16s var(--ease-spring);
+}
+.bg-switch-btn:hover{ background: var(--surface-sunk); color: var(--ink); }
+.bg-switch-btn:active{ transform: scale(.97); }
+.bg-switch-btn[aria-pressed="true"]{ background: var(--ink); color: var(--surface); font-weight: 600; }
+.bg-only-btn{ padding: var(--s2); }
+
+.bg-restore-btn{
+  position: fixed; right: var(--s4); bottom: var(--s4); z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-translucent);
+  backdrop-filter: blur(17px) saturate(180%);
+  -webkit-backdrop-filter: blur(17px) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: var(--s2);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background-color .16s ease, transform .16s var(--ease-spring);
+}
+.bg-restore-btn:hover{ background: var(--surface-sunk); }
+.bg-restore-btn:active{ transform: scale(.95); }
+
+body.bg-only-mode .app{ display: none; }
+body.bg-only-mode .skip-link{ display: none; }
+
+/* Matrix reads best against true black rather than the usual graphite ground. */
+body.bg-matrix-active{ background: #000; }
 
 /* ============================ page-load reveal ========================== */
 @keyframes rise{

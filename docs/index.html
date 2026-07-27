@@ -16,6 +16,10 @@
 <noscript><style>body{ background: var(--paper) url('img/network-dark.png') center / cover fixed no-repeat; }</style></noscript>
 <canvas id="bgCanvas" aria-hidden="true"></canvas>
 
+<button id="bgRestoreBtn" class="bg-restore-btn" type="button" hidden title="Show dashboard" aria-label="Show dashboard">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="1" y="3" width="14" height="9" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M5 14h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+</button>
+
 <a class="skip-link" href="#stage">Skip to dashboard</a>
 
 <div class="app">
@@ -52,7 +56,16 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>
           </span></h1>
         </div>
-        <div class="date-range"></div>
+        <div class="page-head-controls">
+          <div class="date-range"></div>
+          <div class="bg-switch" role="group" aria-label="Background style">
+            <button class="bg-switch-btn" type="button" data-bg="particles" aria-pressed="false">Particles</button>
+            <button class="bg-switch-btn" type="button" data-bg="matrix" aria-pressed="false">Matrix</button>
+            <button class="bg-switch-btn bg-only-btn" type="button" id="bgOnlyBtn" title="Background only" aria-label="Show background only">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="1" y="3" width="14" height="9" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M5 14h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </div>
       </header>
 
       <section class="kpi-grid" id="kpiGrid" aria-label="Key figures"></section>
