@@ -846,7 +846,227 @@ const matrixRenderer = (() => {
   };
 })();
 
-const BACKGROUNDS = [particlesRenderer, matrixRenderer];
+/* ---- Matrix 2.0: perspective hallway of falling code, converging on a
+   feathered door. Floor/ceiling march through depth toward the door; walls
+   cascade vertically (ceiling to floor) like classic matrix rain wrapped
+   onto the wall's perspective-shrinking cross-section. ---- */
+const matrix2Renderer = (() => {
+  const GLYPHS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789+-*/<>=';
+  const BASE_Z = 3;           // depth at which a face's cross-section fills the screen
+  const Z_NEAR = 0.55;        // depth at which a column head passes the camera and recycles
+  const Z_FAR = 15;           // spawn depth, right at the door
+  const RATIO_STEP = 1.016;   // multiplicative depth gap between consecutive trail glyphs
+  const COLS_PER_FACE = 74;   // floor/ceiling columns -- same role as COL_SPACING in the flat renderer
+  const WALL_SLOTS_PER_FACE = 220;
+  const FACES = ['floor', 'ceiling']; // left/right use the vertical wall-rain system below
+  const RING_STEP = 90;
+  const RING_SPEED = 260;
+  const DEPTH_BUCKETS = 28;
+
+  let columns = [], wallColumns = [], rafId = null, ringPhase = 0, lastT = 0;
+  const buckets = Array.from({ length: DEPTH_BUCKETS }, () => []);
+  const leadBucket = [];
+
+  function spawnColumn(face, u, headZ){
+    return {
+      face, u, headZ,
+      speed: 2.4 + Math.random() * 3.0,
+      trail: 40 + Math.floor(Math.random() * 30),
+      fontScale: 0.6 + Math.random() * 1.0,
+      glyphs: []
+    };
+  }
+  function spawnWallColumn(face, z, headU){
+    const halfH = (bgH / 2) * (BASE_Z / z);
+    const fontScale = 0.6 + Math.random() * 1.0;
+    const depthT = 1 - Math.min(1, Math.max(0, (z - Z_NEAR) / (Z_FAR - Z_NEAR)));
+    const size = (6 + depthT * depthT * 40) * fontScale;
+    return {
+      face, z, headU, depthT,
+      uStep: size / (2 * halfH),
+      speed: 0.16 + Math.random() * 0.22,
+      trail: 30 + Math.floor(Math.random() * 24),
+      fontScale, size,
+      glyphs: []
+    };
+  }
+  function reset(){
+    columns = [];
+    for(const face of FACES){
+      for(let c = 0; c < COLS_PER_FACE; c++){
+        const u = (c + 0.5) / COLS_PER_FACE;
+        columns.push(spawnColumn(face, u, Z_FAR * (0.15 + 0.85 * Math.random())));
+      }
+    }
+    wallColumns = [];
+    const ratio = Z_FAR / Z_NEAR;
+    for(const face of ['left', 'right']){
+      for(let c = 0; c < WALL_SLOTS_PER_FACE; c++){
+        const t = (c + 0.5) / WALL_SLOTS_PER_FACE;
+        const z = Z_NEAR * Math.pow(ratio, t);
+        wallColumns.push(spawnWallColumn(face, z, Math.random()));
+      }
+    }
+  }
+
+  function project(face, u, z){
+    const halfW = (bgW / 2) * (BASE_Z / z);
+    const halfH = (bgH / 2) * (BASE_Z / z);
+    const cx = bgW / 2, cy = bgH / 2;
+    switch(face){
+      case 'floor':   return { x: cx + (u * 2 - 1) * halfW, y: cy + halfH };
+      case 'ceiling': return { x: cx + (u * 2 - 1) * halfW, y: cy - halfH };
+      case 'left':    return { x: cx - halfW, y: cy + (u * 2 - 1) * halfH };
+      case 'right':   return { x: cx + halfW, y: cy + (u * 2 - 1) * halfH };
+    }
+  }
+
+  function bucketIndexForZ(z){
+    const t = Math.min(1, Math.max(0, (z - Z_NEAR) / (Z_FAR * 1.3 - Z_NEAR)));
+    return Math.min(DEPTH_BUCKETS - 1, Math.floor(t * DEPTH_BUCKETS));
+  }
+
+  function draw(now){
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+
+    const [cr, cg, cb] = bgAccentRgb();
+    bgCtx.fillStyle = '#000';
+    bgCtx.fillRect(0, 0, bgW, bgH);
+
+    const cx0 = bgW / 2, cy0 = bgH / 2;
+
+    bgCtx.strokeStyle = `rgba(${cr},${cg},${cb},0.1)`;
+    bgCtx.lineWidth = 1;
+    bgCtx.beginPath();
+    bgCtx.moveTo(cx0, cy0); bgCtx.lineTo(0, 0);
+    bgCtx.moveTo(cx0, cy0); bgCtx.lineTo(bgW, 0);
+    bgCtx.moveTo(cx0, cy0); bgCtx.lineTo(0, bgH);
+    bgCtx.moveTo(cx0, cy0); bgCtx.lineTo(bgW, bgH);
+    bgCtx.stroke();
+
+    ringPhase = (ringPhase + RING_SPEED * dt) % RING_STEP;
+    for(let r = ringPhase; r < Math.max(bgW, bgH); r += RING_STEP){
+      const t = r / (Math.max(bgW, bgH) * 1.2);
+      const halfW = Math.min(r, bgW / 2);
+      const halfH = Math.min(r * (bgH / bgW), bgH / 2);
+      bgCtx.strokeStyle = `rgba(${cr},${cg},${cb},${(0.07 * (1 - t)).toFixed(3)})`;
+      bgCtx.strokeRect(cx0 - halfW, cy0 - halfH, halfW * 2, halfH * 2);
+    }
+
+    for(const b of buckets) b.length = 0;
+    leadBucket.length = 0;
+
+    for(const col of columns){
+      col.headZ -= col.speed * dt;
+      if(col.headZ <= Z_NEAR){
+        Object.assign(col, spawnColumn(col.face, col.u, Z_FAR));
+        continue;
+      }
+
+      let z = col.headZ;
+      for(let t = 0; t < col.trail; t++){
+        if(z > Z_FAR * 1.3) break;
+
+        if(Math.random() < 0.06 || !col.glyphs[t]) col.glyphs[t] = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+
+        const { x, y } = project(col.face, col.u, z);
+        const depthT = 1 - Math.min(1, Math.max(0, (z - Z_NEAR) / (Z_FAR - Z_NEAR)));
+        const size = (6 + depthT * depthT * 40) * col.fontScale;
+        const sizeBucket = Math.round(size / 6) * 6;
+        const alpha = Math.max(0, 1 - t / col.trail) * Math.min(1, 0.4 + depthT * 1.0);
+        const item = { x, y, sizeBucket, alpha, glyph: col.glyphs[t] };
+
+        if(t === 0) leadBucket.push(item);
+        else buckets[bucketIndexForZ(z)].push(item);
+        z *= RATIO_STEP;
+      }
+    }
+
+    for(const col of wallColumns){
+      col.headU += col.speed * dt;
+      if(col.headU - col.trail * col.uStep > 1){
+        Object.assign(col, spawnWallColumn(col.face, col.z, -Math.random() * col.trail * col.uStep));
+        continue;
+      }
+
+      const sizeBucket = Math.round(col.size / 6) * 6;
+      const bIndex = bucketIndexForZ(col.z);
+
+      for(let t = 0; t < col.trail; t++){
+        const u = col.headU - t * col.uStep;
+        if(u < 0 || u > 1) continue;
+
+        if(Math.random() < 0.06 || !col.glyphs[t]) col.glyphs[t] = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+
+        const { x, y } = project(col.face, u, col.z);
+        const alpha = Math.max(0, 1 - t / col.trail) * Math.min(1, 0.4 + col.depthT * 1.0);
+        const item = { x, y, sizeBucket, alpha, glyph: col.glyphs[t] };
+
+        if(t === 0) leadBucket.push(item);
+        else buckets[bIndex].push(item);
+      }
+    }
+
+    bgCtx.textAlign = 'center';
+    bgCtx.textBaseline = 'middle';
+
+    let lastFont = '';
+    function setFont(sizeBucket){
+      const f = sizeBucket + 'px "Consolas", monospace';
+      if(f !== lastFont){ bgCtx.font = f; lastFont = f; }
+    }
+
+    bgCtx.shadowBlur = 0;
+    for(let bi = DEPTH_BUCKETS - 1; bi >= 0; bi--){
+      const list = buckets[bi];
+      list.sort((a, b) => a.sizeBucket - b.sizeBucket);
+      for(const d of list){
+        setFont(d.sizeBucket);
+        bgCtx.fillStyle = `rgba(${cr},${cg},${cb},${d.alpha.toFixed(3)})`;
+        bgCtx.fillText(d.glyph, d.x, d.y);
+      }
+    }
+
+    leadBucket.sort((a, b) => a.sizeBucket - b.sizeBucket);
+    bgCtx.shadowBlur = 12;
+    bgCtx.shadowColor = `rgb(${Math.min(255, cr + 170)},${Math.min(255, cg + 170)},${Math.min(255, cb + 170)})`;
+    for(const d of leadBucket){
+      setFont(d.sizeBucket);
+      bgCtx.fillStyle = `rgba(${Math.min(255, cr + 170)},${Math.min(255, cg + 170)},${Math.min(255, cb + 170)},${d.alpha.toFixed(3)})`;
+      bgCtx.fillText(d.glyph, d.x, d.y);
+    }
+    bgCtx.shadowBlur = 0;
+
+    // the door: feathered edge via layered fills, not ctx.filter blur --
+    // filter forces a full-buffer blur pass and cost ~30% of the frame
+    // budget for one rectangle; this costs nothing measurable.
+    const doorHalfW = (bgW / 2) * (BASE_Z / Z_FAR) * 0.9;
+    const doorHalfH = (bgH / 2) * (BASE_Z / Z_FAR) * 0.9;
+    const FEATHER_LAYERS = 6;
+    const FEATHER_PX = 14;
+    for(let i = FEATHER_LAYERS; i >= 0; i--){
+      const pad = (i / FEATHER_LAYERS) * FEATHER_PX;
+      const alpha = i === 0 ? 1 : (1 - i / FEATHER_LAYERS) * 0.55;
+      bgCtx.fillStyle = `rgba(5,5,5,${alpha.toFixed(3)})`;
+      bgCtx.fillRect(cx0 - doorHalfW - pad, cy0 - doorHalfH - pad, (doorHalfW + pad) * 2, (doorHalfH + pad) * 2);
+    }
+  }
+
+  function loop(now){
+    draw(now);
+    if(!bgReducedMotion()) rafId = requestAnimationFrame(loop);
+  }
+
+  return {
+    id: 'matrix2', label: 'Matrix 2.0',
+    start(){ reset(); lastT = performance.now(); rafId = requestAnimationFrame(loop); },
+    stop(){ if(rafId != null) cancelAnimationFrame(rafId); rafId = null; },
+    resize(){ reset(); if(bgReducedMotion()) draw(performance.now()); }
+  };
+})();
+
+const BACKGROUNDS = [particlesRenderer, matrixRenderer, matrix2Renderer];
 const BG_STORAGE_KEY = 'furadi-bg';
 let activeBg = null;
 
@@ -860,7 +1080,7 @@ function setActiveBackground(id, { persist = true } = {}){
   document.querySelectorAll('.bg-switch-btn[data-bg]').forEach(btn => {
     btn.setAttribute('aria-pressed', String(btn.dataset.bg === activeBg.id));
   });
-  document.body.classList.toggle('bg-matrix-active', activeBg.id === 'matrix');
+  document.body.classList.toggle('bg-matrix-active', activeBg.id === 'matrix' || activeBg.id === 'matrix2');
 }
 
 function initBackground(){
