@@ -2,6 +2,14 @@
    (via the shared docs/rail.js), minus the "All accounts" entry, and opens
    each account's real profile page externally instead of filtering a view. */
 
+const DASHBOARD_URL = 'https://furadicon.github.io/furadi-social-analytics/';
+
+function initDashboardLink() {
+  document.getElementById('dashboardLink').addEventListener('click', () => {
+    window.electronAPI.openExternal(DASHBOARD_URL);
+  });
+}
+
 async function initPinToggle() {
   const btn = document.getElementById('pinToggle');
   const setPressed = (on) => btn.setAttribute('aria-pressed', String(on));
@@ -55,6 +63,7 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  initDashboardLink();
   initPinToggle();
   initOpacitySlider();
   init();

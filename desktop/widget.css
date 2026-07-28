@@ -56,6 +56,25 @@ body {
   color: var(--accent);
 }
 
+.widget-brand-btn {
+  -webkit-app-region: no-drag;
+  display: block;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-stretch: 92%;
+  letter-spacing: -0.03em;
+  font-size: 16px;
+}
+.widget-brand-btn:hover {
+  color: var(--accent);
+}
+
 .widget-opacity-row {
   display: flex;
   align-items: center;
