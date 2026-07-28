@@ -97,6 +97,25 @@ async function createWindow() {
 
   win.once('ready-to-show', () => win.show());
 
+  // Windows can silently drop a window out of the topmost Z-band -- after
+  // certain focus changes, notification toasts, or another app briefly
+  // grabbing topmost itself -- without ever telling Electron the flag
+  // changed. Calling setAlwaysOnTop(true) again while Electron still
+  // *thinks* it's already topmost can be a no-op (Windows sees "no change
+  // requested" and skips the actual Z-restack) -- toggling off then back on
+  // forces a real SetWindowPos(HWND_TOPMOST) instead of being silently
+  // swallowed. moveTop() is added on top of that in case another topmost
+  // window (a notification toast, etc.) still sits above ours within the
+  // topmost band itself.
+  function reassertAlwaysOnTop() {
+    if (!settings.alwaysOnTop || !win || win.isDestroyed()) return;
+    win.setAlwaysOnTop(false);
+    win.setAlwaysOnTop(true);
+    win.moveTop();
+  }
+  win.on('blur', reassertAlwaysOnTop);
+  setInterval(reassertAlwaysOnTop, 5000);
+
   // Defense in depth: nothing in widget.js calls window.open() today (the
   // account buttons go through the IPC channel below instead), but if a
   // future link ever does, send it to the real browser instead of spawning
