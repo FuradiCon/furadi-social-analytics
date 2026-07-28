@@ -784,7 +784,7 @@ const particlesRenderer = (() => {
 /* ---- Matrix: dense falling-code rain, glowing leading characters ---- */
 const matrixRenderer = (() => {
   const GLYPHS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789+-*/<>=';
-  const COL_SPACING = 15; // tight relative to glyph size so columns overlap into a wall
+  const COL_SPACING = 20; // tight relative to glyph size so columns overlap into a wall
   let columns = [], rafId = null;
 
   function reset(){
@@ -792,15 +792,20 @@ const matrixRenderer = (() => {
     columns = Array.from({ length: colCount }, () => ({
       y: Math.random() * -bgH,
       speed: 1.5 + Math.random() * 2,
-      trail: 20 + Math.floor(Math.random() * 18),
-      fontSize: 20 + Math.random() * 30, // randomized per column, 20-50px
+      trail: 20 + Math.floor(Math.random() * 80), // 20-100
+      fontSize: 20 + Math.random() * 20, // randomized per column, 20-40px
       glyphs: [] // per-cell glyph, only rerolled occasionally so it doesn't flicker every frame
     }));
   }
 
-  function draw(){
+  function draw(dt){
     const [cr, cg, cb] = bgAccentRgb();
-    bgCtx.fillStyle = 'rgba(0,0,0,0.10)'; // slow fade over solid-black ground = long, dense trails
+    // fade rate was tuned as "10% per frame at an assumed 60fps" -- normalize
+    // to real elapsed time so a capped/uncapped/high-refresh loop all decay
+    // trails at the same real-world rate instead of just whatever the
+    // monitor's refresh happens to be
+    const fadeAlpha = 1 - Math.pow(0.9, dt * 60);
+    bgCtx.fillStyle = `rgba(0,0,0,${fadeAlpha.toFixed(4)})`;
     bgCtx.fillRect(0, 0, bgW, bgH);
     bgCtx.textBaseline = 'top';
 
@@ -827,22 +832,33 @@ const matrixRenderer = (() => {
         }
         bgCtx.fillText(glyph, x, y);
       }
-      col.y += col.speed;
+      col.y += col.speed * dt * 60; // speeds were tuned per-frame at an assumed 60fps
       if(col.y - col.trail * col.fontSize > bgH) col.y = Math.random() * -200;
     });
     bgCtx.shadowBlur = 0;
   }
 
-  function loop(){
-    draw();
+  // cap to 60fps so an uncapped rAF loop doesn't redraw this 2-3x more
+  // often than needed on a 120Hz+ display -- movement is scaled by dt
+  // (real elapsed time) so the capped frame rate doesn't change fall speed
+  const MIN_FRAME_MS = 1000 / 60;
+  let lastFrameTime = 0;
+  function loop(now){
+    if(now - lastFrameTime < MIN_FRAME_MS){
+      rafId = requestAnimationFrame(loop);
+      return;
+    }
+    const dt = lastFrameTime ? Math.min(0.05, (now - lastFrameTime) / 1000) : 1 / 60;
+    lastFrameTime = now;
+    draw(dt);
     if(!bgReducedMotion()) rafId = requestAnimationFrame(loop);
   }
 
   return {
     id: 'matrix', label: 'Matrix',
-    start(){ reset(); loop(); },
+    start(){ reset(); lastFrameTime = 0; rafId = requestAnimationFrame(loop); },
     stop(){ if(rafId != null) cancelAnimationFrame(rafId); rafId = null; },
-    resize(){ reset(); if(bgReducedMotion()) draw(); }
+    resize(){ reset(); if(bgReducedMotion()) draw(1 / 60); }
   };
 })();
 
@@ -856,14 +872,19 @@ const matrix2Renderer = (() => {
   const Z_NEAR = 0.55;        // depth at which a column head passes the camera and recycles
   const Z_FAR = 15;           // spawn depth, right at the door
   const RATIO_STEP = 1.016;   // multiplicative depth gap between consecutive trail glyphs
-  const COLS_PER_FACE = 74;   // floor/ceiling columns -- same role as COL_SPACING in the flat renderer
+  const COLS_PER_FACE = 110;  // floor/ceiling columns -- same role as COL_SPACING in the flat renderer
   const WALL_SLOTS_PER_FACE = 220;
   const FACES = ['floor', 'ceiling']; // left/right use the vertical wall-rain system below
   const RING_STEP = 90;
   const RING_SPEED = 260;
   const DEPTH_BUCKETS = 28;
+  const FLAT_SQUASH_Y = 0.6; // vertical scale for floor/ceiling glyphs so they read as lying flat on the plane (Star Wars crawl) instead of billboarded upright
+  const FLAT_SQUASH_X = 0.6; // horizontal scale for wall glyphs -- walls recede along screen-X (see project()), so "flat against the wall" means squashing X instead of Y
+  const DOOR_COLS = 20;
+  const DOOR_GLYPH_STEP = 0.16; // trail spacing in door-normalized units
+  const ALPHA_MIN = 0.025; // below this a glyph is imperceptible -- skip the fillText
 
-  let columns = [], wallColumns = [], rafId = null, ringPhase = 0, lastT = 0;
+  let columns = [], wallColumns = [], doorColumns = [], rafId = null, ringPhase = 0, lastT = 0;
   const buckets = Array.from({ length: DEPTH_BUCKETS }, () => []);
   const leadBucket = [];
 
@@ -871,22 +892,31 @@ const matrix2Renderer = (() => {
     return {
       face, u, headZ,
       speed: 2.4 + Math.random() * 3.0,
-      trail: 40 + Math.floor(Math.random() * 30),
+      trail: 90 + Math.floor(Math.random() * 40),
       fontScale: 0.6 + Math.random() * 1.0,
       glyphs: []
     };
   }
   function spawnWallColumn(face, z, headU){
-    const halfH = (bgH / 2) * (BASE_Z / z);
+    const halfH = (bgW / 2) * (BASE_Z / z); // matches project()'s halfH -- see note there
     const fontScale = 0.6 + Math.random() * 1.0;
     const depthT = 1 - Math.min(1, Math.max(0, (z - Z_NEAR) / (Z_FAR - Z_NEAR)));
-    const size = (6 + depthT * depthT * 40) * fontScale;
+    const size = (10 + depthT * depthT * 40) * fontScale;
     return {
       face, z, headU, depthT,
       uStep: size / (2 * halfH),
       speed: 0.16 + Math.random() * 0.22,
-      trail: 30 + Math.floor(Math.random() * 24),
+      trail: 40 + Math.floor(Math.random() * 30),
       fontScale, size,
+      glyphs: []
+    };
+  }
+  function spawnDoorColumn(xNorm){
+    return {
+      xNorm,
+      headYNorm: -1 - Math.random() * 1.5,
+      speed: 0.35 + Math.random() * 0.5,
+      trail: 6 + Math.floor(Math.random() * 6),
       glyphs: []
     };
   }
@@ -907,11 +937,19 @@ const matrix2Renderer = (() => {
         wallColumns.push(spawnWallColumn(face, z, Math.random()));
       }
     }
+    doorColumns = [];
+    for(let c = 0; c < DOOR_COLS; c++){
+      doorColumns.push(spawnDoorColumn((c + 0.5) / DOOR_COLS * 2 - 1));
+    }
   }
 
   function project(face, u, z){
     const halfW = (bgW / 2) * (BASE_Z / z);
-    const halfH = (bgH / 2) * (BASE_Z / z);
+    // halfH shares halfW's (width-based) formula rather than scaling off
+    // bgH -- the door is a square sized off bgW, so floor/ceiling/wall
+    // trails need the same width-based vertical scale to actually converge
+    // on its edges instead of falling short of a taller-than-natural door
+    const halfH = halfW;
     const cx = bgW / 2, cy = bgH / 2;
     switch(face){
       case 'floor':   return { x: cx + (u * 2 - 1) * halfW, y: cy + halfH };
@@ -921,9 +959,45 @@ const matrix2Renderer = (() => {
     }
   }
 
+  // fades a face's glyphs toward 0 near its outer edge (u -> 0 or 1) so the
+  // floor/ceiling field and the wall field overlap and blend into each other
+  // at the seam instead of butting up against a hard boundary
+  function edgeFade(u){
+    const d = Math.min(u, 1 - u);
+    const FADE_W = 0.14;
+    return d >= FADE_W ? 1 : d / FADE_W;
+  }
+
   function bucketIndexForZ(z){
     const t = Math.min(1, Math.max(0, (z - Z_NEAR) / (Z_FAR * 1.3 - Z_NEAR)));
     return Math.min(DEPTH_BUCKETS - 1, Math.floor(t * DEPTH_BUCKETS));
+  }
+
+  // hoisted out of draw() so these closures aren't reallocated 60x/sec
+  const flatRank = { y: 0, x: 1 };
+  let lastFont = '';
+  function setFont(sizeBucket){
+    const f = sizeBucket + 'px "Consolas", monospace';
+    if(f !== lastFont){ bgCtx.font = f; lastFont = f; }
+  }
+  // floor/ceiling glyphs squash vertically (lying flat on the plane); wall
+  // glyphs squash horizontally (flat against the wall -- walls recede along
+  // screen-X, see project()). Tracks transform state so it's only touched
+  // on a switch between flat/non-flat.
+  let transformMode = null;
+  function drawGlyph(d){
+    if(d.flat === 'y'){
+      bgCtx.setTransform(1, 0, 0, FLAT_SQUASH_Y, d.x, d.y);
+      bgCtx.fillText(d.glyph, 0, 0);
+      transformMode = 'y';
+    } else if(d.flat === 'x'){
+      bgCtx.setTransform(FLAT_SQUASH_X, 0, 0, 1, d.x, d.y);
+      bgCtx.fillText(d.glyph, 0, 0);
+      transformMode = 'x';
+    } else {
+      if(transformMode){ bgCtx.setTransform(1, 0, 0, 1, 0, 0); transformMode = null; }
+      bgCtx.fillText(d.glyph, d.x, d.y);
+    }
   }
 
   function draw(now){
@@ -931,19 +1005,12 @@ const matrix2Renderer = (() => {
     lastT = now;
 
     const [cr, cg, cb] = bgAccentRgb();
+    bgCtx.setTransform(1, 0, 0, 1, 0, 0); // floor/ceiling glyphs below leave a scale transform set; guarantee identity here
+    transformMode = null; // drawGlyph's transform-tracking var is now module-level, so it must be reset alongside the canvas transform above
     bgCtx.fillStyle = '#000';
     bgCtx.fillRect(0, 0, bgW, bgH);
 
     const cx0 = bgW / 2, cy0 = bgH / 2;
-
-    bgCtx.strokeStyle = `rgba(${cr},${cg},${cb},0.1)`;
-    bgCtx.lineWidth = 1;
-    bgCtx.beginPath();
-    bgCtx.moveTo(cx0, cy0); bgCtx.lineTo(0, 0);
-    bgCtx.moveTo(cx0, cy0); bgCtx.lineTo(bgW, 0);
-    bgCtx.moveTo(cx0, cy0); bgCtx.lineTo(0, bgH);
-    bgCtx.moveTo(cx0, cy0); bgCtx.lineTo(bgW, bgH);
-    bgCtx.stroke();
 
     ringPhase = (ringPhase + RING_SPEED * dt) % RING_STEP;
     for(let r = ringPhase; r < Math.max(bgW, bgH); r += RING_STEP){
@@ -965,20 +1032,23 @@ const matrix2Renderer = (() => {
       }
 
       let z = col.headZ;
+      const colFade = edgeFade(col.u);
       for(let t = 0; t < col.trail; t++){
         if(z > Z_FAR * 1.3) break;
+
+        const depthT = 1 - Math.min(1, Math.max(0, (z - Z_NEAR) / (Z_FAR - Z_NEAR)));
+        const alpha = Math.max(0, 1 - t / col.trail) * Math.min(1, 0.4 + depthT * 1.0) * colFade;
+        // below-threshold tail glyphs skip glyph selection + projection too,
+        // not just the bucket push -- no point doing that work to discard it
+        if(t !== 0 && alpha < ALPHA_MIN){ z *= RATIO_STEP; continue; }
 
         if(Math.random() < 0.06 || !col.glyphs[t]) col.glyphs[t] = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
 
         const { x, y } = project(col.face, col.u, z);
-        const depthT = 1 - Math.min(1, Math.max(0, (z - Z_NEAR) / (Z_FAR - Z_NEAR)));
-        const size = (6 + depthT * depthT * 40) * col.fontScale;
+        const size = (10 + depthT * depthT * 40) * col.fontScale;
         const sizeBucket = Math.round(size / 6) * 6;
-        const alpha = Math.max(0, 1 - t / col.trail) * Math.min(1, 0.4 + depthT * 1.0);
-        const item = { x, y, sizeBucket, alpha, glyph: col.glyphs[t] };
-
-        if(t === 0) leadBucket.push(item);
-        else buckets[bucketIndexForZ(z)].push(item);
+        if(t === 0) leadBucket.push({ x, y, sizeBucket, alpha, glyph: col.glyphs[t], flat: 'y' });
+        else buckets[bucketIndexForZ(z)].push({ x, y, sizeBucket, alpha, glyph: col.glyphs[t], flat: 'y' });
         z *= RATIO_STEP;
       }
     }
@@ -997,70 +1067,119 @@ const matrix2Renderer = (() => {
         const u = col.headU - t * col.uStep;
         if(u < 0 || u > 1) continue;
 
+        const alpha = Math.max(0, 1 - t / col.trail) * Math.min(1, 0.4 + col.depthT * 1.0) * edgeFade(u);
+        if(t !== 0 && alpha < ALPHA_MIN) continue;
+
         if(Math.random() < 0.06 || !col.glyphs[t]) col.glyphs[t] = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
 
         const { x, y } = project(col.face, u, col.z);
-        const alpha = Math.max(0, 1 - t / col.trail) * Math.min(1, 0.4 + col.depthT * 1.0);
-        const item = { x, y, sizeBucket, alpha, glyph: col.glyphs[t] };
-
-        if(t === 0) leadBucket.push(item);
-        else buckets[bIndex].push(item);
+        if(t === 0) leadBucket.push({ x, y, sizeBucket, alpha, glyph: col.glyphs[t], flat: 'x' });
+        else buckets[bIndex].push({ x, y, sizeBucket, alpha, glyph: col.glyphs[t], flat: 'x' });
       }
     }
 
     bgCtx.textAlign = 'center';
     bgCtx.textBaseline = 'middle';
 
-    let lastFont = '';
-    function setFont(sizeBucket){
-      const f = sizeBucket + 'px "Consolas", monospace';
-      if(f !== lastFont){ bgCtx.font = f; lastFont = f; }
-    }
-
     bgCtx.shadowBlur = 0;
     for(let bi = DEPTH_BUCKETS - 1; bi >= 0; bi--){
       const list = buckets[bi];
-      list.sort((a, b) => a.sizeBucket - b.sizeBucket);
+      list.sort((a, b) => (flatRank[a.flat] ?? 2) - (flatRank[b.flat] ?? 2) || a.sizeBucket - b.sizeBucket);
       for(const d of list){
         setFont(d.sizeBucket);
         bgCtx.fillStyle = `rgba(${cr},${cg},${cb},${d.alpha.toFixed(3)})`;
-        bgCtx.fillText(d.glyph, d.x, d.y);
+        drawGlyph(d);
       }
     }
 
-    leadBucket.sort((a, b) => a.sizeBucket - b.sizeBucket);
-    bgCtx.shadowBlur = 12;
+    leadBucket.sort((a, b) => (flatRank[a.flat] ?? 2) - (flatRank[b.flat] ?? 2) || a.sizeBucket - b.sizeBucket);
+    // shadowBlur forces a blur pass per fillText -- one of the priciest
+    // canvas ops there is; 12 was overkill for a still-glowy lead glyph
+    bgCtx.shadowBlur = 7;
     bgCtx.shadowColor = `rgb(${Math.min(255, cr + 170)},${Math.min(255, cg + 170)},${Math.min(255, cb + 170)})`;
     for(const d of leadBucket){
       setFont(d.sizeBucket);
       bgCtx.fillStyle = `rgba(${Math.min(255, cr + 170)},${Math.min(255, cg + 170)},${Math.min(255, cb + 170)},${d.alpha.toFixed(3)})`;
-      bgCtx.fillText(d.glyph, d.x, d.y);
+      drawGlyph(d);
     }
     bgCtx.shadowBlur = 0;
+    if(transformMode){ bgCtx.setTransform(1, 0, 0, 1, 0, 0); transformMode = null; }
 
-    // the door: feathered edge via layered fills, not ctx.filter blur --
-    // filter forces a full-buffer blur pass and cost ~30% of the frame
-    // budget for one rectangle; this costs nothing measurable.
+    // the door: a small clipped panel of scrolling code standing in for
+    // "the hallway keeps going past here", with a feathered edge blending
+    // it into the dark -- layered fills, not ctx.filter blur (filter forces
+    // a full-buffer blur pass and cost ~30% of the frame budget for one
+    // rectangle; this costs nothing measurable).
+    // square door, sized off bgW like the floor/ceiling/wall halfH above so
+    // the trails converge right on its edges instead of stopping short
     const doorHalfW = (bgW / 2) * (BASE_Z / Z_FAR) * 0.9;
-    const doorHalfH = (bgH / 2) * (BASE_Z / Z_FAR) * 0.9;
+    const doorHalfH = doorHalfW;
+
+    bgCtx.save();
+    bgCtx.beginPath();
+    bgCtx.rect(cx0 - doorHalfW, cy0 - doorHalfH, doorHalfW * 2, doorHalfH * 2);
+    bgCtx.clip();
+    bgCtx.fillStyle = 'rgba(2,4,2,0.92)';
+    bgCtx.fillRect(cx0 - doorHalfW, cy0 - doorHalfH, doorHalfW * 2, doorHalfH * 2);
+
+    const doorFontPx = Math.max(6, doorHalfH * 0.16);
+    bgCtx.font = doorFontPx + 'px "Consolas", monospace';
+    for(const col of doorColumns){
+      col.headYNorm += col.speed * dt;
+      if(col.headYNorm - col.trail * DOOR_GLYPH_STEP > 1.3){
+        Object.assign(col, spawnDoorColumn(col.xNorm));
+        continue;
+      }
+      const x = cx0 + col.xNorm * doorHalfW;
+      for(let t = 0; t < col.trail; t++){
+        const yNorm = col.headYNorm - t * DOOR_GLYPH_STEP;
+        if(yNorm < -1.3 || yNorm > 1.3) continue;
+        const alpha = Math.max(0, 1 - t / col.trail);
+        if(alpha < ALPHA_MIN) continue;
+        if(Math.random() < 0.08 || !col.glyphs[t]) col.glyphs[t] = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+        const y = cy0 + yNorm * doorHalfH;
+        bgCtx.fillStyle = t === 0
+          ? `rgba(${Math.min(255, cr + 170)},${Math.min(255, cg + 170)},${Math.min(255, cb + 170)},${alpha.toFixed(3)})`
+          : `rgba(${cr},${cg},${cb},${(alpha * 0.9).toFixed(3)})`;
+        bgCtx.fillText(col.glyphs[t], x, y);
+      }
+    }
+    bgCtx.restore();
+
     const FEATHER_LAYERS = 6;
     const FEATHER_PX = 14;
-    for(let i = FEATHER_LAYERS; i >= 0; i--){
+    for(let i = FEATHER_LAYERS; i >= 1; i--){
       const pad = (i / FEATHER_LAYERS) * FEATHER_PX;
-      const alpha = i === 0 ? 1 : (1 - i / FEATHER_LAYERS) * 0.55;
+      const alpha = (1 - i / FEATHER_LAYERS) * 0.55;
       bgCtx.fillStyle = `rgba(5,5,5,${alpha.toFixed(3)})`;
-      bgCtx.fillRect(cx0 - doorHalfW - pad, cy0 - doorHalfH - pad, (doorHalfW + pad) * 2, (doorHalfH + pad) * 2);
+      // ring only (outer padded rect minus the door bounds) so the feather
+      // never washes back over the scrolling code inside the door
+      bgCtx.beginPath();
+      bgCtx.rect(cx0 - doorHalfW - pad, cy0 - doorHalfH - pad, (doorHalfW + pad) * 2, (doorHalfH + pad) * 2);
+      bgCtx.rect(cx0 - doorHalfW, cy0 - doorHalfH, doorHalfW * 2, doorHalfH * 2);
+      bgCtx.fill('evenodd');
     }
   }
 
+  // this scene is heavy (thousands of fillText calls/frame); on a 120Hz+
+  // display an uncapped rAF loop redraws it 2-3x more often than the eye
+  // can use, so cap to 60fps -- dt (derived from lastT in draw()) still
+  // reflects real elapsed time, so motion speed is unaffected.
+  const MIN_FRAME_MS = 1000 / 60;
+  let lastFrameTime = 0;
   function loop(now){
+    if(now - lastFrameTime < MIN_FRAME_MS){
+      rafId = requestAnimationFrame(loop);
+      return;
+    }
+    lastFrameTime = now;
     draw(now);
     if(!bgReducedMotion()) rafId = requestAnimationFrame(loop);
   }
 
   return {
     id: 'matrix2', label: 'Matrix 2.0',
-    start(){ reset(); lastT = performance.now(); rafId = requestAnimationFrame(loop); },
+    start(){ reset(); lastT = performance.now(); lastFrameTime = 0; rafId = requestAnimationFrame(loop); },
     stop(){ if(rafId != null) cancelAnimationFrame(rafId); rafId = null; },
     resize(){ reset(); if(bgReducedMotion()) draw(performance.now()); }
   };
