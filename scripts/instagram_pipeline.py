@@ -95,6 +95,7 @@ def fetch_instagram_bundle(token_file, client_secret_file, window_days=28):
         "slug": "instagram",
         "platform": "instagram",
         "name": f"@{username}",
+        "url": f"https://www.instagram.com/{username}/",
         "dateRangeIso": f"{cur_start.date().isoformat()} → {now.date().isoformat()}",
         "followers": profile.get("followers_count", 0),
         "mediaCount": profile.get("media_count", 0),

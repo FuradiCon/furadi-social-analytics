@@ -1,0 +1,76 @@
+/* Frameless floating widget: the whole window IS the rail card, no page
+   chrome around it. Everything else (the frosted-glass surface, blur, accent
+   spines) comes from styles.css's existing .rail-inner treatment. */
+html, body {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+}
+
+body {
+  display: flex;
+}
+
+.rail-inner {
+  flex: 1;
+  position: static;
+  margin: 8px;
+  /* No title bar, so the panel itself is the drag handle. */
+  -webkit-app-region: drag;
+  /* Overrides styles.css's fixed --surface-translucent fill with a
+     user-adjustable alpha (see the opacity slider), same base colour. */
+  background: rgba(42, 44, 49, var(--panel-bg-alpha, 0.2));
+}
+
+.channel-tab-btn {
+  -webkit-app-region: no-drag;
+}
+
+.rail-brand {
+  justify-content: space-between;
+}
+
+.widget-pin-btn {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.widget-pin-btn svg {
+  width: 15px;
+  height: 15px;
+}
+.widget-pin-btn:hover {
+  background: var(--surface-sunk);
+  color: var(--ink);
+}
+.widget-pin-btn[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+.widget-opacity-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-top: var(--s3);
+  padding: 0 var(--s2);
+  -webkit-app-region: no-drag;
+}
+.widget-opacity-label {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  flex: none;
+}
+.widget-opacity-slider {
+  flex: 1;
+  accent-color: var(--accent);
+}

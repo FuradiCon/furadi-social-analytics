@@ -1,0 +1,23 @@
+{
+  "name": "furadi-account-rail-widget",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Floating frosted-glass desktop launcher for the Furadi Social Analytics account rail.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.furadi.accountrailwidget",
+    "productName": "Furadi Accounts",
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    }
+  }
+}

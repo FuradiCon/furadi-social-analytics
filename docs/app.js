@@ -5,17 +5,15 @@
 let CHANNELS = [];
 let activeIdx = 'all';
 
-/* Instagram rows ship without an accent block (YouTube ones carry theirs from
-   the pipeline), so give the account its own mark colour here. */
-const IG_ACCENT = { accent: '#FF2D95', accentStrong: '#FFA6D3', accentSoft: '#4A0E2C' };
+/* IG_ACCENT, fmtInt, escapeHtml, isIG, isTraffic, accentOf, accentVarsStyle,
+   sparklinePath, MAIL_ICON_PATH, and railItemHtml now live in rail.js (loaded
+   before this file in index.html) so the dashboard and the desktop widget
+   share one copy of the rail's rendering logic. */
 
 /* ---------- formatting ---------- */
-function fmtInt(n){ return Number(n || 0).toLocaleString('en-US'); }
 function fmtDay(d){ const dt = new Date(d + 'T00:00:00'); return dt.toLocaleDateString('en-US', { month:'short', day:'numeric' }); }
 function fmtDur(s){ const m = Math.floor(s/60), sec = Math.round(s%60); return m + ':' + String(sec).padStart(2,'0'); }
 function fmtUsd(n){ return '$' + Number(n || 0).toFixed(2); }
-// Escapes &, <, > via textContent, then quotes — output is also used in attribute position.
-function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function timeAgo(iso){
   const diffSec = Math.floor((Date.now() - new Date(iso).getTime())/1000);
   if(diffSec < 60) return 'just now';
@@ -28,9 +26,6 @@ function timeAgo(iso){
   return fmtDay(iso.slice(0,10));
 }
 function plural(n, word){ return fmtInt(n) + ' ' + word + (Math.abs(n) === 1 ? '' : 's'); }
-function isIG(ch){ return ch.platform === 'instagram'; }
-function isTraffic(ch){ return ch.kind === 'traffic'; }
-function accentOf(ch){ return ch.accent || IG_ACCENT; }
 
 /* Rounds an axis maximum up so that `ticks` evenly spaced gridlines all land on
    whole numbers — every metric here is a count, so "0 · 2 · 3 · 5" style axes
@@ -482,9 +477,6 @@ function renderTables(ch){
 }
 
 /* ---------- Accent swapping ---------- */
-function accentVarsStyle(a){
-  return `--accent:${a.accent};--accent-strong:${a.accentStrong};--accent-soft:${a.accentSoft};`;
-}
 function applyAccent(a){
   const root = document.documentElement.style;
   root.setProperty('--accent', a.accent);
@@ -589,53 +581,10 @@ function renderViewAll(){
 
 /* ---------- The channel rail (signature element) ----------
    Each account is a stacked 28-day terrain trace in its own accent, so the
-   whole portfolio compares at a glance and the nav does real work. */
-function sparklinePath(rows, key, w, h){
-  if(!rows || rows.length < 2) return null;
-  const vals = rows.map(r => r[key]);
-  const max = Math.max(...vals) || 1;
-  const pts = vals.map((v,i) => [ (i/(vals.length - 1)) * w, h - (v/max) * (h - 2) - 1 ]);
-  const line = pts.map((p,i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
-  return { line, area: `${line} L${w},${h} L0,${h} Z` };
-}
-
-const MAIL_ICON_PATH = '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/>';
-
-function railItemHtml(ch, idx){
-  const a = accentOf(ch);
-  const rows = ch.data || [];
-  let metric, spark = '';
-  if(isIG(ch)){
-    metric = fmtInt(ch.followers) + ' followers';
-  }else{
-    const views = rows.reduce((s,r) => s + r.views, 0);
-    metric = fmtInt(views) + ' views · 28d';
-    const p = sparklinePath(rows, 'views', 100, 24);
-    if(p) spark = `
-      <svg class="rail-spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
-        <path d="${p.area}" fill="${a.accent}" opacity="0.16"/>
-        <path d="${p.line}" fill="none" stroke="${a.accent}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-      </svg>`;
-  }
-  // Instagram and traffic-only channels don't carry a hasNewComments flag --
-  // only show the reply-status indicator for the YouTube channels.
-  const hasNew = !!ch.hasNewComments;
-  const alertHtml = (isIG(ch) || isTraffic(ch)) ? '' : `
-    <span class="rail-alert${hasNew ? ' flag' : ''}" aria-hidden="true" title="${hasNew ? 'A comment is awaiting a reply' : 'Comments'}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${MAIL_ICON_PATH}</svg>
-    </span>`;
-  return `
-    <button class="channel-tab-btn" type="button" role="tab" data-idx="${idx}" aria-selected="false" style="${accentVarsStyle(a)}">
-      <span class="rail-row">
-        <span class="channel-dot" aria-hidden="true"></span>
-        <span class="rail-name">${escapeHtml(ch.name)}</span>
-        ${alertHtml}
-      </span>
-      <span class="rail-metric">${metric}</span>
-      ${spark}
-    </button>`;
-}
-
+   whole portfolio compares at a glance and the nav does real work.
+   railItemHtml() itself lives in rail.js (shared with the desktop widget) —
+   this just assembles the full rail (including the dashboard-only "All
+   accounts" entry) and wires the filter-on-click behavior. */
 function buildRail(){
   const el = document.getElementById('channelTabs');
   el.innerHTML =

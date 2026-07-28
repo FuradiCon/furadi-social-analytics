@@ -36,6 +36,7 @@ def test_fetch_steadfast_bundle_windows_last_28_days_and_computes_prior():
         bundle = fetch_steadfast_bundle()
 
     assert bundle["slug"] == "steadfast-counter"
+    assert bundle["url"] == "https://furadicon.github.io/mens-daily/"
     assert bundle["kind"] == "traffic"
     assert bundle["accent"]["accent"]
     assert len(bundle["data"]) == 28

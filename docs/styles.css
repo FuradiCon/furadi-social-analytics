@@ -200,6 +200,16 @@ img{ max-width: 100%; display: block; }
   display: block; width: calc(100% - 16px); height: 24px;
   margin: var(--s2) 0 0 16px;
 }
+.rail-spark-glow{
+  animation: rail-spark-flow 1.8s linear infinite;
+}
+@keyframes rail-spark-flow{
+  from{ transform: translateX(0); }
+  to{ transform: translateX(160px); }
+}
+@media (prefers-reduced-motion: reduce){
+  .rail-spark-glow{ animation: none; }
+}
 
 .rail-foot{
   margin: var(--s5) 0 0;
