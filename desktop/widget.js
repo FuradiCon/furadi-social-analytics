@@ -38,7 +38,29 @@ async function initOpacitySlider() {
   });
 }
 
-async function init() {
+// Same cadence as the dashboard's own reload (see app.js) — re-fetches and
+// re-renders the rail in place so new comment flags, view counts, etc. show
+// up without the widget needing to be relaunched.
+const REFRESH_INTERVAL_MS = 20 * 60 * 1000;
+
+// generatedAt arrives pre-formatted as "YYYY-MM-DD HH:MM UTC" from the
+// Python pipeline. Re-parse and render it in Mountain time for this footer
+// only -- the dashboard itself keeps showing the raw UTC string.
+function formatMountainTime(generatedAt) {
+  const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}) UTC$/.exec(generatedAt || '');
+  if (!m) return generatedAt || '—';
+  const date = new Date(`${m[1]}T${m[2]}:00Z`);
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Denver',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  }).format(date);
+}
+
+async function loadChannels() {
   const tabsEl = document.getElementById('channelTabs');
   let payload;
   try {
@@ -51,7 +73,7 @@ async function init() {
   }
 
   const channels = payload.channels || [];
-  document.getElementById('generatedAt').textContent = payload.generatedAt || '—';
+  document.getElementById('generatedAt').textContent = formatMountainTime(payload.generatedAt);
 
   tabsEl.innerHTML = channels.map(railItemHtml).join('');
   tabsEl.querySelectorAll('.channel-tab-btn').forEach((btn, idx) => {
@@ -66,5 +88,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initDashboardLink();
   initPinToggle();
   initOpacitySlider();
-  init();
+  loadChannels();
+  setInterval(loadChannels, REFRESH_INTERVAL_MS);
 });
