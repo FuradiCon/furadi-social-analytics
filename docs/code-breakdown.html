@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Furadi Social Analytics — Code Breakdown</title>
+<meta name="description" content="End-to-end architecture: the GitHub Actions pipeline, Python data fetchers, and the vanilla-JS dashboard frontend." />
+<style>
+  :root{
+    --paper:      #1A1B1E;
+    --surface:    #2A2C31;
+    --surface-2:  #202125;
+    --ink:        #F1F2F4;
+    --ink-dim:    #9BA2AC;
+    --border:     rgba(241,242,244,.10);
+    --border-2:   rgba(241,242,244,.18);
+    --accent:     #FF5A00;
+    --accent-str: #FFB37A;
+    --accent-soft:#4A2410;
+    --ok:         #3FCE96;
+    --bad:        #E15C54;
+    --font-disp:  'Archivo Black', 'Arial Black', Impact, sans-serif;
+    --font-head:  'Archivo', 'Segoe UI Semibold', system-ui, sans-serif;
+    --font-body:  'Public Sans', 'Segoe UI', system-ui, sans-serif;
+    --font-mono:  'Spline Sans Mono', 'Consolas', 'SF Mono', monospace;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --paper:      #F3F1EC;
+      --surface:    #FFFFFF;
+      --surface-2:  #EAE7DF;
+      --ink:        #22201C;
+      --ink-dim:    #6B6660;
+      --border:     rgba(34,32,28,.10);
+      --border-2:   rgba(34,32,28,.20);
+      --accent:     #C8460A;
+      --accent-str: #7A2A06;
+      --accent-soft:#FBDFC9;
+      --ok:         #147A54;
+      --bad:        #B0332B;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#1A1B1E; --surface:#2A2C31; --surface-2:#202125; --ink:#F1F2F4; --ink-dim:#9BA2AC;
+    --border:rgba(241,242,244,.10); --border-2:rgba(241,242,244,.18);
+    --accent:#FF5A00; --accent-str:#FFB37A; --accent-soft:#4A2410; --ok:#3FCE96; --bad:#E15C54;
+  }
+  :root[data-theme="light"]{
+    --paper:#F3F1EC; --surface:#FFFFFF; --surface-2:#EAE7DF; --ink:#22201C; --ink-dim:#6B6660;
+    --border:rgba(34,32,28,.10); --border-2:rgba(34,32,28,.20);
+    --accent:#C8460A; --accent-str:#7A2A06; --accent-soft:#FBDFC9; --ok:#147A54; --bad:#B0332B;
+  }
+
+  *{ box-sizing:border-box; }
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:var(--font-body); font-size:15px; line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{ background:var(--accent); color:#fff; }
+
+  a{ color:var(--accent); text-decoration:none; }
+  a:hover{ text-decoration:underline; }
+  a:focus-visible, button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  code, .mono{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+  code{ background:var(--surface-2); border:1px solid var(--border); border-radius:4px; padding:.1em .4em; font-size:.9em; }
+
+  h1,h2,h3{ font-family:var(--font-head); text-wrap:balance; letter-spacing:-.01em; }
+
+  .shell{ max-width:1180px; margin:0 auto; padding:56px 32px 120px; display:grid; grid-template-columns:220px minmax(0,1fr); gap:48px; }
+  @media (max-width:920px){ .shell{ grid-template-columns:1fr; padding:32px 20px 80px; } }
+
+  /* ---- masthead ---- */
+  .masthead{ grid-column:1/-1; margin-bottom:8px; }
+  .eyebrow{ font-family:var(--font-mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin:0 0 10px; }
+  h1.title{ font-size:38px; font-weight:800; margin:0 0 10px; line-height:1.08; }
+  .title b{ color:var(--accent); }
+  .dek{ color:var(--ink-dim); max-width:62ch; font-size:16px; margin:0; }
+  .stat-row{ display:flex; gap:28px; flex-wrap:wrap; margin-top:22px; padding-top:20px; border-top:1px solid var(--border); }
+  .stat{ display:flex; flex-direction:column; gap:2px; }
+  .stat .n{ font-family:var(--font-mono); font-size:20px; font-weight:600; }
+  .stat .l{ font-size:12px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.06em; }
+
+  /* ---- toc ---- */
+  .toc{ position:sticky; top:32px; align-self:start; font-size:13.5px; }
+  .toc-label{ font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.1em; color:var(--ink-dim); font-size:11px; margin:0 0 10px; }
+  .toc ol{ list-style:none; margin:0; padding:0; border-left:1px solid var(--border); }
+  .toc li{ margin:0; }
+  .toc a{ display:block; padding:6px 0 6px 14px; color:var(--ink-dim); border-left:2px solid transparent; margin-left:-1px; }
+  .toc a:hover{ color:var(--ink); text-decoration:none; border-left-color:var(--border-2); }
+  @media (max-width:920px){
+    .toc{ position:static; }
+    .toc ol{ display:flex; flex-wrap:wrap; gap:0 4px; border-left:none; }
+    .toc a{ border:1px solid var(--border); border-radius:999px; padding:5px 12px; margin:4px 4px 0 0; font-size:12.5px; }
+  }
+
+  main{ min-width:0; display:flex; flex-direction:column; gap:56px; }
+  section{ scroll-margin-top:24px; }
+  section > h2{ font-size:22px; margin:0 0 6px; display:flex; align-items:baseline; gap:10px; }
+  section > h2 .num{ font-family:var(--font-mono); color:var(--ink-dim); font-size:14px; font-weight:400; }
+  .section-dek{ color:var(--ink-dim); margin:0 0 22px; max-width:66ch; }
+
+  /* ---- flow diagram ---- */
+  .flow{ display:flex; align-items:stretch; gap:0; overflow-x:auto; padding:4px 4px 14px; margin:0 0 8px; }
+  .flow-step{ background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px; min-width:150px; flex-shrink:0; }
+  .flow-step .k{ font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--accent); display:block; margin-bottom:6px; }
+  .flow-step .t{ font-weight:600; font-size:14px; }
+  .flow-step .s{ font-size:12px; color:var(--ink-dim); margin-top:4px; }
+  .flow-arrow{ flex-shrink:0; width:36px; display:flex; align-items:center; justify-content:center; color:var(--ink-dim); font-size:18px; }
+
+  /* ---- file cards ---- */
+  .file{ background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:16px; }
+  .file-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 18px; border-bottom:1px solid var(--border); background:var(--surface-2); }
+  .file-path{ font-family:var(--font-mono); font-size:13px; color:var(--ink); font-weight:600; }
+  .file-loc{ font-family:var(--font-mono); font-size:11.5px; color:var(--ink-dim); }
+  .file-body{ padding:16px 18px; }
+  .file-body p{ margin:0 0 12px; }
+  .file-body p:last-child{ margin-bottom:0; }
+  .file-body ul{ margin:0 0 12px; padding-left:20px; }
+  .file-body li{ margin-bottom:6px; }
+  .file-body li:last-child{ margin-bottom:0; }
+
+  .fn{ font-family:var(--font-mono); font-size:.92em; background:var(--surface-2); border:1px solid var(--border); border-radius:4px; padding:.05em .4em; }
+
+  .callout{ border-left:3px solid var(--accent); background:var(--accent-soft); border-radius:0 8px 8px 0; padding:12px 16px; font-size:13.5px; margin:14px 0; }
+  .callout.ok{ border-left-color:var(--ok); background:color-mix(in srgb, var(--ok) 14%, var(--surface)); }
+  .callout b{ display:block; font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-dim); margin-bottom:4px; font-family:var(--font-mono); }
+
+  .grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:700px){ .grid-2{ grid-template-columns:1fr; } }
+
+  table.spec{ width:100%; border-collapse:collapse; font-size:13px; }
+  table.spec th{ text-align:left; font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-dim); padding:8px 10px; border-bottom:1px solid var(--border-2); }
+  table.spec td{ padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  table.spec td.mono{ white-space:nowrap; }
+  .scrollx{ overflow-x:auto; }
+
+  .pill{ display:inline-block; font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; padding:2px 8px; border-radius:999px; background:var(--surface-2); border:1px solid var(--border-2); color:var(--ink-dim); }
+  .pill.accent{ background:var(--accent-soft); color:var(--accent-str); border-color:transparent; }
+
+  footer{ margin-top:8px; padding-top:24px; border-top:1px solid var(--border); color:var(--ink-dim); font-size:12.5px; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <div class="masthead">
+    <p class="eyebrow">Reference · Furadi Social Analytics</p>
+    <h1 class="title">The dashboard, <b>end to end</b></h1>
+    <p class="dek">A cron job pulls YouTube, Instagram and one external site's traffic into a single JSON file; a vanilla-JS static page reads that file and renders it. No framework, no build step, no chart library — hand-rolled inline SVG and two canvas background renderers.</p>
+    <div class="stat-row">
+      <div class="stat"><span class="n">2,808</span><span class="l">lines, app total</span></div>
+      <div class="stat"><span class="n">1,270</span><span class="l">app.js</span></div>
+      <div class="stat"><span class="n">6</span><span class="l">python pipeline files</span></div>
+      <div class="stat"><span class="n">*/20 * * * *</span><span class="l">cron schedule</span></div>
+      <div class="stat"><span class="n">4 + 2</span><span class="l">YouTube + other channels</span></div>
+    </div>
+  </div>
+
+  <nav class="toc">
+    <p class="toc-label">On this page</p>
+    <ol>
+      <li><a href="#flow">Data flow</a></li>
+      <li><a href="#automation">Automation</a></li>
+      <li><a href="#pipeline">Data pipeline</a></li>
+      <li><a href="#frontend">Frontend shell</a></li>
+      <li><a href="#appjs">app.js</a></li>
+      <li><a href="#backgrounds">Background renderers</a></li>
+      <li><a href="#gotchas">Notable behaviors</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <section id="flow">
+      <h2><span class="num">01</span> Data flow</h2>
+      <p class="section-dek">Everything downstream of the cron job is a single artifact: <code>docs/data.json</code>. The frontend never talks to YouTube, Instagram, or anything else directly.</p>
+      <div class="flow">
+        <div class="flow-step"><span class="k">Trigger</span><span class="t">GitHub Actions cron</span><span class="s">every 20 min</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><span class="k">Orchestrate</span><span class="t">build_data.py</span><span class="s">per-channel, fail-soft</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><span class="k">Fetch ×3</span><span class="t">youtube / instagram / steadfast pipelines</span><span class="s">independent, isolated failures</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><span class="k">Write</span><span class="t">docs/data.json</span><span class="s">atomic tmp + rename</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><span class="k">Publish</span><span class="t">git commit + push</span><span class="s">only if changed</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><span class="k">Serve</span><span class="t">GitHub Pages</span><span class="s">static, no server</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><span class="k">Render</span><span class="t">app.js fetch()</span><span class="s">on page load</span></div>
+      </div>
+    </section>
+
+    <section id="automation">
+      <h2><span class="num">02</span> Automation</h2>
+      <p class="section-dek">One workflow does the whole job — no separate deploy step, since the commit itself <em>is</em> the deploy on GitHub Pages.</p>
+      <div class="file">
+        <div class="file-head">
+          <span class="file-path">.github/workflows/update-dashboard.yml</span>
+          <span class="file-loc">50 lines</span>
+        </div>
+        <div class="file-body">
+          <ul>
+            <li>Cron <code>*/20 * * * *</code> plus a manual <code>workflow_dispatch</code> escape hatch.</li>
+            <li><code>concurrency.cancel-in-progress: false</code> — a slow run finishes rather than getting killed by the next scheduled tick, which would otherwise race the commit.</li>
+            <li>Five secrets get written to disk as credential files at job start (three YouTube token groups, the Instagram token, and its client secret) — nothing is baked into the repo.</li>
+            <li><code>pytest</code> runs <em>before</em> the build step — a red test suite blocks a bad <code>data.json</code> from ever being generated.</li>
+            <li>Commit step diffs first (<code>git diff --cached --quiet ||</code>) so a no-op fetch (nothing changed upstream) doesn't create an empty commit every 20 minutes.</li>
+          </ul>
+          <div class="callout"><b>Why this matters</b>The pipeline can lose one channel entirely (expired token, dead API) and the workflow still goes green and still ships an update — see <span class="fn">build()</span> below.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="pipeline">
+      <h2><span class="num">03</span> Data pipeline — <code>scripts/</code></h2>
+      <p class="section-dek">Five small, independently-testable modules. <span class="fn">build_data.py</span> is the only one that knows about all of them.</p>
+
+      <div class="file">
+        <div class="file-head"><span class="file-path">scripts/build_data.py</span><span class="file-loc">132 lines · orchestrator</span></div>
+        <div class="file-body">
+          <p>Calls the three fetchers for every configured channel, catching exceptions <em>per channel</em> rather than globally:</p>
+          <ul>
+            <li><span class="fn">build()</span> — loops <span class="fn">CHANNEL_CFGS</span> (the 4 YouTube channels), plus one call each for Steadfast Counter and Instagram. Each is wrapped in its own <code>try/except</code>; a single failure just logs and moves on.</li>
+            <li>Only exits non-zero (fails CI) if <em>every</em> source failed — <span class="fn">any_success</span> gates it. One dead token shouldn't redden the whole pipeline run.</li>
+            <li><span class="fn">download_instagram_thumbnails()</span> — Instagram's media URLs are short-lived signed links, so thumbnails get pulled down once into <code>docs/assets/</code> and referenced by local path from then on; a 403 on one thumbnail is caught, the partial file is deleted so the <em>next</em> run retries it, and the post just ships without an image rather than sinking the batch.</li>
+            <li>Final write is <code>data.json.tmp</code> → <span class="fn">os.replace()</span> — an atomic rename, so a page load can never see a half-written file mid-build.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="file">
+          <div class="file-head"><span class="file-path">scripts/youtube_pipeline.py</span><span class="file-loc">198 lines</span></div>
+          <div class="file-body">
+            <ul>
+              <li><span class="fn">get_credentials()</span> — refreshes an expired token silently; only falls back to the interactive OAuth flow (<code>prompt="select_account"</code>, forces the account picker so a logged-in browser can't silently reuse the wrong Google account) when there's no valid refresh token at all.</li>
+              <li>Pulls the YouTube Analytics report (views, watch time, subs, likes/comments/shares by day) for the current window <em>and</em> the prior window, for the KPI delta chips.</li>
+              <li><span class="fn">fetch_recent_comments()</span> + <span class="fn">thread_needs_reply()</span> — walks each comment thread's replies and checks whether the <em>channel owner</em> was the last to reply; that's what drives the "awaiting reply" badge and the favicon glow.</li>
+              <li>Top-video thumbnails link straight to YouTube's own CDN URL rather than being embedded — avoids ballooning <code>data.json</code> (and every 20-minute commit) by hundreds of KB.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="file">
+          <div class="file-head"><span class="file-path">scripts/instagram_pipeline.py</span><span class="file-loc">104 lines</span></div>
+          <div class="file-body">
+            <ul>
+              <li><span class="fn">get_access_token()</span> — refreshes the long-lived token once it's within 3 days of expiry, then <strong>writes the new token back as a GitHub secret</strong> via <code>gh secret set</code> so the next CI run picks it up. The credential file on disk is otherwise disposable.</li>
+              <li>Splits fetched media into current/prior 28-day windows by timestamp for the same delta-chip treatment as YouTube.</li>
+              <li>No OAuth dance here — Instagram's long-lived tokens just get refreshed in place, no browser flow.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="file">
+          <div class="file-head"><span class="file-path">scripts/steadfast_pipeline.py</span><span class="file-loc">74 lines</span></div>
+          <div class="file-body">
+            <p>Not a social account — reads accumulated page-view traffic for a separate site ("Scattered to Steadfast") straight off its own repo's raw <code>traffic.json</code>/<code>usage.json</code> files on GitHub, rather than hitting any live API.</p>
+            <ul>
+              <li>Usage/cost data is fetched separately and allowed to fail soft to <code>{}</code> — traffic numbers matter more than the cost figure, so a broken <code>usage.json</code> shouldn't blank the traffic chart.</li>
+              <li>Rendered first in the rail (prepended in <span class="fn">build()</span>) so it sits above the YouTube channels.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="file">
+          <div class="file-head"><span class="file-path">scripts/datawindow.py</span><span class="file-loc">50 lines · shared helpers</span></div>
+          <div class="file-body">
+            <ul>
+              <li><span class="fn">window_dates()</span> — a fixed 28-day window ending 2 days back (<span class="fn">PROCESSING_LAG_DAYS</span>), since YouTube Analytics data isn't final for the most recent day or two.</li>
+              <li><span class="fn">rows_from_response()</span> / <span class="fn">totals_from_rows()</span> — reshape the Analytics API's column-header + row-array format into named dicts, and roll them up into period totals for the delta chips.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <p style="color:var(--ink-dim); font-size:13px;">A parallel <code>tests/</code> directory (5 files, one per pipeline module) runs via <code>pytest</code> as the CI gate before <span class="fn">build_data.py</span> ever executes.</p>
+    </section>
+
+    <section id="frontend">
+      <h2><span class="num">04</span> Frontend shell — <code>docs/</code></h2>
+      <p class="section-dek">Static site, zero build step. <code>index.html</code> is mostly empty containers; <code>app.js</code> fills every one of them from <code>data.json</code> at runtime.</p>
+
+      <div class="grid-2">
+        <div class="file">
+          <div class="file-head"><span class="file-path">docs/index.html</span><span class="file-loc">180 lines</span></div>
+          <div class="file-body">
+            <ul>
+              <li>The channel rail (<code>#channelTabs</code>) is the signature nav element — each account renders as its own mini terrain-sparkline, built entirely in JS.</li>
+              <li>Chart/table containers exist as empty <code>&lt;div&gt;</code>/<code>&lt;table&gt;</code> shells with fixed IDs — <span class="fn">app.js</span> owns 100% of what goes inside.</li>
+              <li>A <code>&lt;canvas id="bgCanvas"&gt;</code> sits behind everything for the ambient background (see below); a <code>&lt;noscript&gt;</code> fallback swaps in a static network-art image if JS never runs.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="file">
+          <div class="file-head"><span class="file-path">docs/styles.css</span><span class="file-loc">686 lines</span></div>
+          <div class="file-body">
+            <ul>
+              <li>Dark instrument-panel theme: graphite ground, glass-translucent card surfaces, five saturated brand hues reserved strictly for <em>plotted marks</em> (bars, sparkline strokes, chips) — never for glow or for small text sitting directly on the page ground.</li>
+              <li>Per-channel color is a CSS custom-property swap: <span class="fn">applyAccent()</span> in JS rewrites <code>--accent</code> / <code>--accent-strong</code> / <code>--accent-soft</code> on the root, so one stylesheet serves every channel's distinct identity.</li>
+              <li>Semantic up/down colors (<code>--up</code> / <code>--down</code>) are deliberately kept outside the five brand hues, so a subscriber-loss day doesn't accidentally borrow a channel's own brand color.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="appjs">
+      <h2><span class="num">05</span> app.js — section by section</h2>
+      <p class="section-dek">One file, no modules, organized top-to-bottom by comment banners. <span class="fn">CHANNELS</span> (the parsed <code>data.json</code>) and <span class="fn">activeIdx</span> are the only two pieces of global state.</p>
+      <div class="scrollx">
+        <table class="spec">
+          <thead><tr><th>Region</th><th>Lines</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">Formatting</td><td class="mono">13–45</td><td>Number/date/duration formatters, an HTML-escaper, and <span class="fn">niceCeil()</span> — rounds a chart axis max so gridlines land on whole numbers instead of "0 · 2 · 3 · 5".</td></tr>
+            <tr><td class="mono">KPIs</td><td class="mono">48–168</td><td><span class="fn">kpiItemsHtml()</span> builds the top stat row per channel (views, watch time, subs, etc.) with vs.-prior-period delta chips; <span class="fn">animateKpiValues()</span> count-up animates them on render.</td></tr>
+            <tr><td class="mono">Videos / comments</td><td class="mono">170–233</td><td>Top-video grid and the 4 most recent comments, including the "awaiting reply" badge computed upstream in the Python pipeline.</td></tr>
+            <tr><td class="mono">Charts</td><td class="mono">236–449</td><td><b>Hand-rolled inline SVG</b> — no chart library. <span class="fn">renderAreaChart()</span>, <span class="fn">renderStackedBars()</span>, <span class="fn">renderDivergingBars()</span> each build an <code>&lt;svg&gt;</code> string directly from the day rows.</td></tr>
+            <tr><td class="mono">Tables</td><td class="mono">450–483</td><td>Views / engagement / subscribers / full daily log — same row data as the charts, just tabulated.</td></tr>
+            <tr><td class="mono">Accent swapping</td><td class="mono">484–494</td><td><span class="fn">applyAccent()</span> — the per-channel re-theme, described above.</td></tr>
+            <tr><td class="mono">View switching</td><td class="mono">495–589</td><td><span class="fn">renderChannel()</span> (single account) vs. <span class="fn">renderViewAll()</span> (every account's KPIs side by side) — <span class="fn">activeIdx</span> decides which.</td></tr>
+            <tr><td class="mono">The rail</td><td class="mono">590–657</td><td><span class="fn">sparklinePath()</span> + <span class="fn">railItemHtml()</span> build each account's mini terrain-trace nav item — the dashboard's signature visual, and its navigation, in one element.</td></tr>
+            <tr><td class="mono">Tabs / favicon</td><td class="mono">658–697</td><td>Section tab wiring, and a favicon that redraws itself with a glow dot when any channel has an unanswered recent comment.</td></tr>
+            <tr><td class="mono">Backgrounds</td><td class="mono">699–1218</td><td>Full canvas-based background-renderer system — see next section.</td></tr>
+            <tr><td class="mono">Boot</td><td class="mono">1233–1264</td><td><span class="fn">init()</span> fetches <code>data.json</code>, shows a plain-language error card if it 404s, and defaults to the Furad Ride channel. A 20-minute <code>setTimeout</code> reload picks up the next pipeline commit without the user doing anything.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="backgrounds">
+      <h2><span class="num">06</span> Background renderers</h2>
+      <p class="section-dek">Three swappable full-canvas backgrounds behind a shared manager (<span class="fn">setActiveBackground()</span>, persisted to <code>localStorage</code>), each exposing the same tiny <span class="fn">{ id, start, stop, resize }</span> interface.</p>
+      <div class="grid-2">
+        <div class="file">
+          <div class="file-head"><span class="file-path">particlesRenderer</span><span class="file-loc">~60 lines</span></div>
+          <div class="file-body"><p>Drifting dots, linked by a faint line when two fall within range. Count scales with canvas area, capped 36–90.</p></div>
+        </div>
+        <div class="file">
+          <div class="file-head"><span class="file-path">matrixRenderer</span><span class="file-loc">~80 lines</span></div>
+          <div class="file-body"><p>Classic flat falling-code rain. Column speed and the black-fade trail are both normalized to real elapsed time (<code>dt</code>), not frame count, so a capped or high-refresh display doesn't change perceived speed.</p></div>
+        </div>
+      </div>
+      <div class="file">
+        <div class="file-head"><span class="file-path">matrix2Renderer</span><span class="file-loc">~300 lines · this session's build</span></div>
+        <div class="file-body">
+          <p>A perspective hallway of falling code converging on a square door panel — floor and ceiling march through depth, walls cascade top-to-bottom, everything squashed flat against its own surface (floor/ceiling squash vertically, walls squash horizontally — a Star Wars crawl effect via <code>ctx.setTransform</code>).</p>
+          <ul>
+            <li>Depth-bucketed + size-quantized draw order avoids per-glyph <code>ctx.font</code> reassignment, one of canvas's most expensive operations at scale.</li>
+            <li>An <code>ALPHA_MIN</code> cutoff skips both the bucket <em>and</em> the glyph-selection/projection work for any trail glyph too faint to see — checked before the expensive part, not after.</li>
+            <li>Render loop capped to 60fps with motion normalized by <code>dt</code>, so the cap changes cost, never perceived speed.</li>
+            <li>Floor/ceiling/wall vertical projection deliberately shares the width-based scale formula (not height-based) so all three surfaces converge exactly on the door's edges.</li>
+          </ul>
+          <div class="callout ok"><b>Why it's split out</b>By far the heaviest of the three — thousands of <code>fillText</code> calls/frame — so it carries all the latency-specific work: frame capping, alpha culling, and hoisting per-frame closures out of the draw loop.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="gotchas">
+      <h2><span class="num">07</span> Notable behaviors</h2>
+      <p class="section-dek">Things that aren't obvious from reading either half of the codebase in isolation.</p>
+      <table class="spec">
+        <thead><tr><th>Behavior</th><th>Where</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>One dead channel never fails the whole build</td><td class="mono">build_data.py</td><td>Per-channel <code>try/except</code>; only a total wipeout exits non-zero.</td></tr>
+          <tr><td>Instagram token rotates itself in CI</td><td class="mono">instagram_pipeline.py</td><td><code>gh secret set</code> writes the refreshed token back as a repo secret, no manual step.</td></tr>
+          <tr><td>Google OAuth always shows the account picker</td><td class="mono">youtube_pipeline.py</td><td><code>prompt="select_account"</code> — prevents a logged-in browser silently reusing the wrong account on re-auth.</td></tr>
+          <tr><td>data.json write is atomic</td><td class="mono">build_data.py</td><td>tmp file + <code>os.replace()</code> — no reader ever sees a half-written file.</td></tr>
+          <tr><td>No empty commits</td><td class="mono">update-dashboard.yml</td><td><code>git diff --cached --quiet ||</code> before committing.</td></tr>
+          <tr><td>No chart library, no framework</td><td class="mono">app.js</td><td>Charts are hand-built SVG strings; the whole frontend is one script tag.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer>Generated from the current state of the <code>FuradiCon/furadi-social-analytics</code> repo — file line counts and section boundaries will drift as the code does.</footer>
+
+  </main>
+</div>
+</body>
+</html>
