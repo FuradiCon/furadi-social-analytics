@@ -4,6 +4,14 @@
 
 const DASHBOARD_URL = 'https://furadicon.github.io/furadi-social-analytics/';
 
+// The pipeline runs in GitHub Actions and commits fresh data to the *remote*,
+// so the data.json sitting in the local checkout only moves when someone runs
+// `git pull` by hand -- which is why the footer timestamp used to sit frozen
+// for days. Read the published copy instead (same file the dashboard itself
+// reads), and keep the on-disk one as an offline fallback.
+const DATA_URL = 'https://furadicon.github.io/furadi-social-analytics/data.json';
+const LOCAL_DATA_URL = '/docs/data.json';
+
 function initDashboardLink() {
   document.getElementById('dashboardLink').addEventListener('click', () => {
     window.electronAPI.openExternal(DASHBOARD_URL);
@@ -60,16 +68,24 @@ function formatMountainTime(generatedAt) {
   }).format(date);
 }
 
+async function fetchJson(url) {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
 async function loadChannels() {
   const tabsEl = document.getElementById('channelTabs');
   let payload;
   try {
-    const res = await fetch('/docs/data.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    payload = await res.json();
-  } catch (err) {
-    tabsEl.innerHTML = `<p class="rail-metric">Could not load data.json (${err.message}). Run the pipeline, then reopen.</p>`;
-    return;
+    payload = await fetchJson(DATA_URL);
+  } catch (remoteErr) {
+    try {
+      payload = await fetchJson(LOCAL_DATA_URL);
+    } catch (localErr) {
+      tabsEl.innerHTML = `<p class="rail-metric">Could not load data.json (${remoteErr.message}, then ${localErr.message}). Check your connection, then reopen.</p>`;
+      return;
+    }
   }
 
   const channels = payload.channels || [];

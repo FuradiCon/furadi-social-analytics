@@ -97,21 +97,21 @@ async function createWindow() {
 
   win.once('ready-to-show', () => win.show());
 
-  // Windows can silently drop a window out of the topmost Z-band -- after
-  // certain focus changes, notification toasts, or another app briefly
-  // grabbing topmost itself -- without ever telling Electron the flag
-  // changed. Calling setAlwaysOnTop(true) again while Electron still
-  // *thinks* it's already topmost can be a no-op (Windows sees "no change
-  // requested" and skips the actual Z-restack) -- toggling off then back on
-  // forces a real SetWindowPos(HWND_TOPMOST) instead of being silently
-  // swallowed. moveTop() is added on top of that in case another topmost
-  // window (a notification toast, etc.) still sits above ours within the
-  // topmost band itself.
+  // Windows refuses HWND_TOPMOST requests from a background app while another
+  // app is running exclusive-fullscreen (a video playing fullscreen on a second
+  // monitor is enough). So never clear the flag ourselves hoping to re-set it:
+  // the clear always succeeds, the re-set can be silently denied, and the
+  // window is then left un-pinned until something restores foreground
+  // ownership. Only assert topmost when it has actually been lost.
+  //
+  // isAlwaysOnTop() is safe to branch on -- Electron reads the real
+  // WS_EX_TOPMOST bit off the window handle rather than returning a cached
+  // value, so this sees genuine OS state, including demotions Windows
+  // performed without telling us.
   function reassertAlwaysOnTop() {
     if (!settings.alwaysOnTop || !win || win.isDestroyed()) return;
-    win.setAlwaysOnTop(false);
+    if (win.isAlwaysOnTop()) return;
     win.setAlwaysOnTop(true);
-    win.moveTop();
   }
   win.on('blur', reassertAlwaysOnTop);
   setInterval(reassertAlwaysOnTop, 5000);
