@@ -1,11 +1,20 @@
 """
 Fetches accumulated daily page-view traffic (and Anthropic API cost) for the
 "Scattered to Steadfast" site (github.com/FuradiCon/mens-daily) and shapes it
-into a dashboard channel bundle. That site's own daily pipeline records
-GitHub's repo traffic API output (which only retains 14 days natively) into
-a rolling traffic.json, and its own per-run Anthropic API usage into
-usage.json, so this just reads the already-accumulated history rather than
-hitting either source directly.
+into a dashboard channel bundle. That site's own daily pipeline records its
+page views into a rolling traffic.json, and its per-run Anthropic API usage
+into usage.json, so this just reads the already-accumulated history rather
+than hitting either source directly.
+
+Traffic source note: until 2026-07-29 the upstream pipeline recorded GitHub's
+repo traffic API, which measures views of the *repository page* on github.com
+rather than visits to the published Pages site — so it reported zeros for its
+entire history. It now records GoatCounter. Two consequences here:
+
+  * traffic.json became an object (`{"fetched_at", "last_error", "days"}`)
+    instead of a bare array. Both are accepted, old-format first.
+  * day rows no longer carry `uniques`. GoatCounter exposes a single
+    already-deduplicated number per day, so `uniques` defaults to 0.
 """
 
 import json
@@ -41,8 +50,15 @@ def _cost_by_date(usage_url):
     return totals
 
 
+def _day_rows(payload):
+    """traffic.json is an envelope since 2026-07-29; it was a bare array before."""
+    if isinstance(payload, list):
+        return payload
+    return payload.get("days", [])
+
+
 def fetch_steadfast_bundle(url=TRAFFIC_URL, usage_url=USAGE_URL):
-    rows = _fetch_json(url)
+    rows = _day_rows(_fetch_json(url))
     cost_by_date = _cost_by_date(usage_url)
 
     window = rows[-WINDOW_DAYS:]

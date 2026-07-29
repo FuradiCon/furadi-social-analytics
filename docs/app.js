@@ -14,6 +14,9 @@ let activeIdx = 'all';
 function fmtDay(d){ const dt = new Date(d + 'T00:00:00'); return dt.toLocaleDateString('en-US', { month:'short', day:'numeric' }); }
 function fmtDur(s){ const m = Math.floor(s/60), sec = Math.round(s%60); return m + ':' + String(sec).padStart(2,'0'); }
 function fmtUsd(n){ return '$' + Number(n || 0).toFixed(2); }
+/* Averages below 10 keep one decimal: rounding a real 0.2/day down to a bare "0"
+   next to a non-zero total reads as broken rather than small. */
+function fmtAvg(n){ const v = Number(n || 0); return v > 0 && v < 10 ? v.toFixed(1) : fmtInt(Math.round(v)); }
 function timeAgo(iso){
   const diffSec = Math.floor((Date.now() - new Date(iso).getTime())/1000);
   if(diffSec < 60) return 'just now';
@@ -73,17 +76,20 @@ function kpiItemsHtml(ch, forViewAll){
     const rows = ch.data || [];
     if(!rows.length) return null;
     const totalViews = rows.reduce((s,r) => s + r.views, 0);
-    const totalUniques = rows.reduce((s,r) => s + (r.uniques || 0), 0);
     const avgViews = totalViews / rows.length;
     const best = rows.reduce((a,b) => b.views > a.views ? b : a, rows[0]);
     const totalCost = rows.reduce((s,r) => s + (r.costUsd || 0), 0);
+    const activeDays = rows.filter(r => r.views > 0).length;
     const prior = ch.prior;
+    // No "Unique visitors" tile: the traffic source (GoatCounter, since 2026-07-29)
+    // reports one already-deduplicated number per day, so a uniques tile could only
+    // ever read 0.
     return kpiCardsHtml([
-      { label:'Page views',      value: fmtInt(totalViews),           sub:'across ' + rows.length + ' days', delta: pctDeltaHtml(totalViews, prior && prior.views) },
-      { label:'Unique visitors', value: fmtInt(totalUniques),         sub:'across ' + rows.length + ' days', delta: pctDeltaHtml(totalUniques, prior && prior.uniques) },
-      { label:'Daily average',   value: fmtInt(Math.round(avgViews)), sub:'views per day' },
-      { label:'Best day',        value: fmtInt(best.views),           sub: fmtDay(best.d) },
-      { label:'API cost',        value: fmtUsd(totalCost),            sub:'estimated, ' + rows.length + ' days' }
+      { label:'Page views',    value: fmtInt(totalViews),      sub:'across ' + rows.length + ' days', delta: pctDeltaHtml(totalViews, prior && prior.views) },
+      { label:'Daily average', value: fmtAvg(avgViews),        sub:'views per day' },
+      { label:'Best day',      value: fmtInt(best.views),      sub: fmtDay(best.d) },
+      { label:'Active days',   value: fmtInt(activeDays),      sub:'of ' + rows.length + ' with any views' },
+      { label:'API cost',      value: fmtUsd(totalCost),       sub:'estimated, ' + rows.length + ' days' }
     ]);
   }
 
@@ -224,6 +230,20 @@ function renderComments(ch){
   const html = commentsHtml(ch);
   if(!html){ section.hidden = true; list.innerHTML = ''; return; }
   list.innerHTML = html;
+  section.hidden = false;
+}
+
+/* ---------- Simple-channel primary chart (traffic channels' daily page views) ---------- */
+function renderTrafficChart(ch){
+  const section = document.getElementById('trafficChartSection');
+  const rows = (ch.data || []).filter(r => typeof r.views === 'number');
+  if(!isTraffic(ch) || !rows.length){ section.hidden = true; return; }
+
+  renderAreaChart('chart-traffic', rows, 'views', {
+    color: accentOf(ch).accent,
+    unit: 'views',
+    formatValue: fmtInt,
+  });
   section.hidden = false;
 }
 
@@ -526,12 +546,13 @@ function renderChannel(idx){
   alertEl.setAttribute('aria-label', alertLabel);
 
   document.querySelector('.source').textContent = ch.dateRangeIso
-    ? (ig ? 'instagram_analytics · ' : traffic ? 'github_traffic · ' : 'youtube_analytics · ') + ch.dateRangeIso
+    ? (ig ? 'instagram_analytics · ' : traffic ? 'goatcounter · ' : 'youtube_analytics · ') + ch.dateRangeIso
     : '';
 
   renderKPIs(ch);
   renderTopVideos(ch);
   renderComments(ch);
+  renderTrafficChart(ch);
   renderSimpleChart(ch);
 
   document.querySelector('.tabs').hidden = simple;
@@ -547,7 +568,7 @@ function renderChannel(idx){
 function renderViewAll(){
   activeIdx = 'all';
   showAll();
-  document.querySelector('.source').textContent = 'github_traffic + youtube_analytics + instagram_analytics · all accounts';
+  document.querySelector('.source').textContent = 'goatcounter + youtube_analytics + instagram_analytics · all accounts';
 
   const wrap = document.getElementById('viewAllWrap');
   wrap.innerHTML = CHANNELS.map((ch,i) => {

@@ -64,6 +64,50 @@ def test_fetch_steadfast_bundle_handles_empty_history():
     assert bundle["dateRangeIso"] == "No data yet"
 
 
+def test_fetch_steadfast_bundle_reads_the_goatcounter_envelope():
+    """traffic.json became an object when the source moved to GoatCounter
+    (2026-07-29); the day rows now live under "days"."""
+    envelope = {
+        "fetched_at": "2026-07-29T17:26:41Z",
+        "last_error": None,
+        "days": [{"d": "2026-07-28", "views": 4}, {"d": "2026-07-29", "views": 7}],
+    }
+    with patch("scripts.steadfast_pipeline.urllib.request.urlopen", side_effect=_by_url({"traffic.json": envelope, "usage.json": []})):
+        bundle = fetch_steadfast_bundle()
+
+    assert [r["d"] for r in bundle["data"]] == ["2026-07-28", "2026-07-29"]
+    assert bundle["data"][-1]["views"] == 7
+    assert bundle["dateRangeIso"] == "2026-07-28 → 2026-07-29"
+
+
+def test_fetch_steadfast_bundle_defaults_uniques_when_absent():
+    """GoatCounter exposes one already-deduplicated number per day, so rows
+    no longer carry uniques at all."""
+    envelope = {"fetched_at": None, "last_error": None, "days": [{"d": "2026-07-29", "views": 7}]}
+    with patch("scripts.steadfast_pipeline.urllib.request.urlopen", side_effect=_by_url({"traffic.json": envelope, "usage.json": []})):
+        bundle = fetch_steadfast_bundle()
+
+    assert bundle["data"][0]["uniques"] == 0
+
+
+def test_fetch_steadfast_bundle_handles_empty_envelope():
+    envelope = {"fetched_at": None, "last_error": None, "days": []}
+    with patch("scripts.steadfast_pipeline.urllib.request.urlopen", side_effect=_by_url({"traffic.json": envelope, "usage.json": []})):
+        bundle = fetch_steadfast_bundle()
+
+    assert bundle["data"] == []
+    assert bundle["prior"] is None
+    assert bundle["dateRangeIso"] == "No data yet"
+
+
+def test_fetch_steadfast_bundle_still_reads_the_legacy_bare_array():
+    rows = [_row("2026-07-26", views=10)]
+    with patch("scripts.steadfast_pipeline.urllib.request.urlopen", side_effect=_by_url({"traffic.json": rows, "usage.json": []})):
+        bundle = fetch_steadfast_bundle()
+
+    assert bundle["data"][0]["views"] == 10
+
+
 def test_cost_by_date_sums_multiple_runs_on_the_same_day():
     runs = [_run("2026-07-26", 0.40), _run("2026-07-26", 2.59), _run("2026-07-25", 0.10)]
     with patch("scripts.steadfast_pipeline.urllib.request.urlopen", return_value=_mock_response(runs)):
