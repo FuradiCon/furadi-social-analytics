@@ -515,7 +515,10 @@ function renderChannel(idx){
   document.querySelector('.page-head h1').firstChild.nodeValue = ig ? 'Account performance' : traffic ? 'Page performance' : 'Daily performance';
 
   const alertEl = document.getElementById('commentAlert');
-  const hasNew = !simple && !!ch.hasNewComments;
+  // Page-level question, so it matches the favicon: "is anything waiting?", not
+  // "does this channel have something?" (the rail envelopes answer that). Still
+  // hidden entirely on Instagram/traffic channels, which carry no comment data.
+  const hasNew = !simple && anyNewComments();
   alertEl.classList.toggle('shown', !simple);
   alertEl.classList.toggle('flag', hasNew);
   const alertLabel = hasNew ? 'A comment is awaiting a reply' : 'Comments';
@@ -617,32 +620,73 @@ function wireTabs(){
   });
 }
 
+/* Single source of truth for "is anything waiting for a reply?". The favicon
+   and the page-head envelope both answer that page-level question, so they read
+   the same helper rather than each rolling their own test — they previously
+   disagreed, with the favicon global and the header scoped to the selected
+   channel, so a comment on an unselected channel lit one and not the other.
+   Which channel it is stays the rail envelopes' job. */
+function anyNewComments(){ return CHANNELS.some(ch => !!ch.hasNewComments); }
+
 /* ---------- Favicon comment-alert glow ----------
    Same mark, two renders: the plain tab icon, and a version with a warm
    radial wash + blurred underlay behind the checkmark so it reads as "lit up"
-   even at favicon size. Swapped in once at boot based on whether ANY channel
-   has an unanswered recent comment — this is deliberately account-agnostic,
-   so it doesn't use --accent (that's per-channel and changes with the tab). */
-function faviconSvg(glow){
+   even at favicon size. Driven by whether ANY channel has an unanswered recent
+   comment — this is deliberately account-agnostic, so it doesn't use --accent
+   (that's per-channel and changes with the tab).
+
+   The glow pulses via `intensity` (0..1). Favicons can't be animated with CSS
+   or SVG animation — browsers rasterise them as static images — so the only
+   way to move one is to rewrite the icon href on a timer. Known limitation,
+   accepted knowingly: browsers throttle timers in hidden tabs to roughly 1Hz,
+   then to once a minute under Chrome's intensive throttling after ~5 minutes
+   hidden, so this animates while the tab is visible and effectively freezes
+   once it's backgrounded. */
+function faviconSvg(glow, intensity = 1){
+  const k = glow ? Math.max(0, Math.min(1, intensity)) : 0;
   const bg = glow
     ? `<defs><radialGradient id='g' cx='50%' cy='45%' r='75%'>
-         <stop offset='0%' stop-color='#FF5A00' stop-opacity='.9'/>
-         <stop offset='55%' stop-color='#7A2E00' stop-opacity='.55'/>
+         <stop offset='0%' stop-color='#FF5A00' stop-opacity='${(0.45 + 0.45 * k).toFixed(3)}'/>
+         <stop offset='55%' stop-color='#7A2E00' stop-opacity='${(0.30 + 0.25 * k).toFixed(3)}'/>
          <stop offset='100%' stop-color='#12161C'/>
        </radialGradient></defs>
        <rect width='16' height='16' rx='3' fill='url(#g)'/>`
     : `<rect width='16' height='16' rx='3' fill='#12161C'/>`;
   const glowStroke = glow
-    ? `<path d='M2 11 L5 8 L8 9.5 L11 4.5 L14 6.5' fill='none' stroke='#FF5A00' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' opacity='.55' filter='blur(.8px)'/>`
+    ? `<path d='M2 11 L5 8 L8 9.5 L11 4.5 L14 6.5' fill='none' stroke='#FF5A00' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' opacity='${(0.30 + 0.35 * k).toFixed(3)}' filter='blur(.8px)'/>`
     : '';
   const strokeColor = glow ? '#FFD9B3' : '#FF5A00';
   return `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'>${bg}${glowStroke}`
     + `<path d='M2 11 L5 8 L8 9.5 L11 4.5 L14 6.5' fill='none' stroke='${strokeColor}' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>`;
 }
-function updateFavicon(anyNewComments){
+
+const FAVICON_PULSE_MS = 2000;
+const FAVICON_PULSE_FPS = 10;
+let faviconPulseTimer = null;
+
+function paintFavicon(glow, intensity){
   const link = document.querySelector('link[rel="icon"]');
   if(!link) return;
-  link.href = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg(anyNewComments));
+  link.href = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg(glow, intensity));
+}
+
+function updateFavicon(anyNew){
+  // Clear first, unconditionally: repeated calls must not stack intervals, and
+  // going from lit to unlit has to stop the timer rather than leave one
+  // spinning against a tab icon that no longer changes.
+  if(faviconPulseTimer){ clearInterval(faviconPulseTimer); faviconPulseTimer = null; }
+  if(!anyNew){ paintFavicon(false, 0); return; }
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    paintFavicon(true, 1);
+    return;
+  }
+  const start = performance.now();
+  const tick = () => {
+    const phase = ((performance.now() - start) % FAVICON_PULSE_MS) / FAVICON_PULSE_MS;
+    paintFavicon(true, (1 - Math.cos(phase * 2 * Math.PI)) / 2);
+  };
+  tick();
+  faviconPulseTimer = setInterval(tick, 1000 / FAVICON_PULSE_FPS);
 }
 
 /* ---------- Background manager ----------
@@ -1204,7 +1248,7 @@ async function init(){
   CHANNELS.forEach(ch => { ch.tableRows = ch.data ? [...ch.data].reverse() : []; });
 
   document.getElementById('generatedAt').textContent = payload.generatedAt || '—';
-  updateFavicon(CHANNELS.some(ch => !!ch.hasNewComments));
+  updateFavicon(anyNewComments());
   buildRail();
   wireTabs();
   // Steadfast Counter sits first in the rail, but Furad Ride stays the

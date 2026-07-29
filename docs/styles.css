@@ -274,6 +274,24 @@ img{ max-width: 100%; display: block; }
 .rail-alert.flag{ color: var(--accent); }
 .comment-alert.flag{ color: var(--accent); }
 
+/* A lit envelope breathes so it stays noticeable on a dashboard left open all
+   day. drop-shadow rather than box-shadow: these are stroked SVG icons, so the
+   glow has to follow the envelope silhouette instead of drawing a rectangle
+   around the containing span. Only .flag elements animate — unlit envelopes
+   stay completely still. The desktop widget gets this for free: it loads this
+   stylesheet and builds its rail from the shared rail.js. */
+@keyframes comment-alert-pulse{
+  0%, 100%{ filter: drop-shadow(0 0 2px color-mix(in srgb, var(--accent) 55%, transparent)); }
+  50%     { filter: drop-shadow(0 0 7px var(--accent)); }
+}
+.rail-alert.flag,
+.comment-alert.flag{ animation: comment-alert-pulse 2s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce){
+  .rail-alert.flag,
+  .comment-alert.flag{ animation: none; }
+}
+
 /* ============================== KPIs ==================================== */
 .kpi-grid{
   display: grid;
