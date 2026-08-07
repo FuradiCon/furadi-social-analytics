@@ -348,6 +348,8 @@ function updateCommentDisclosures(scope){
     const hasOverflow = Number.isFinite(lineHeight) && text.scrollHeight > lineHeight * 3 + 1;
     if(!hasOverflow){
       button.setAttribute('aria-expanded', 'false');
+      button.textContent = 'Show more';
+      button.setAttribute('aria-label', `Show full comment from ${text.closest('.comment-item').querySelector('.comment-author').textContent}`);
       return;
     }
 

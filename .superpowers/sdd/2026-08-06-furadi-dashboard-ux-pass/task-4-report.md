@@ -23,3 +23,7 @@ Changed only `docs/app.js`, `docs/styles.css`, `docs/index.html`, and this repor
 - Start comment text unclamped; after layout, clamp and reveal the disclosure only when a reliable three-line overflow measurement confirms it. Visible comment grids remeasure on resize.
 - Include a unique render context in each disclosure ID so `aria-controls` cannot collide across coexisting render targets.
 - Send the review action to `commentUrl` when available, otherwise `videoUrl`; comments without either continue to use the local review marker.
+
+## Final Fix Round
+
+- Reset a disclosure that no longer overflows to the collapsed `Show more` / `Show full comment` state during remeasurement, preventing stale collapse labels after a resize.
