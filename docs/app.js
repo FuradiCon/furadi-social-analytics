@@ -44,10 +44,10 @@ function setSelectedAccountLabel(label){
   document.getElementById('selectedAccountLabel').textContent = label;
 }
 
-/* IG_ACCENT, fmtInt, escapeHtml, isIG, isTraffic, accentOf, accentVarsStyle,
-   sparklinePath, MAIL_ICON_PATH, and railItemHtml now live in rail.js (loaded
-   before this file in index.html) so the dashboard and the desktop widget
-   share one copy of the rail's rendering logic. */
+/* IG_ACCENT, fmtInt, escapeHtml, isIG, isTraffic, accentOf, platformLabel,
+   accentVarsStyle, sparklinePath, MAIL_ICON_PATH, and railItemHtml now live in
+   rail.js (loaded before this file in index.html) so the dashboard and the
+   desktop widget share one copy of the rail's rendering logic. */
 
 /* ---------- formatting ---------- */
 function fmtDay(d){ const dt = new Date(d + 'T00:00:00'); return dt.toLocaleDateString('en-US', { month:'short', day:'numeric' }); }
@@ -711,6 +711,7 @@ function renderChannel(idx){
   setSelectedAccountLabel(ch.name);
 
   document.querySelector('.eyebrow').textContent = ch.name;
+  document.querySelector('.active-account-platform-label').innerHTML = platformLabel(ch);
   document.querySelector('.date-range').textContent = ch.dateRangeIso || 'No data yet';
   renderFreshnessStatus(dashboardPayload);
   // Instagram ships period totals and traffic ships page views, neither is a
@@ -767,7 +768,10 @@ function renderViewAll(){
         <div class="viewall-head">
           <div class="viewall-title">
             <span class="channel-dot" aria-hidden="true"></span>
-            <h2>${escapeHtml(ch.name)}</h2>
+            <div class="viewall-title-copy">
+              <h2>${escapeHtml(ch.name)}</h2>
+              <span class="account-platform-label">${platformLabel(ch)}</span>
+            </div>
           </div>
           <span class="date-range">${escapeHtml(ch.dateRangeIso || 'No data yet')}</span>
         </div>

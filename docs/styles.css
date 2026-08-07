@@ -190,6 +190,16 @@ img{ max-width: 100%; display: block; }
   font-weight: 600; font-size: 14px; letter-spacing: -.01em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.account-platform-label{
+  display: block;
+  font-family: var(--font-mono); font-size: 9.5px; line-height: 1.35;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.channel-tab-btn > .account-platform-label{
+  margin-top: 3px;
+  padding-left: 16px;
+}
 .rail-metric{
   display: block;
   font-family: var(--font-mono); font-size: 11px;
@@ -241,6 +251,7 @@ img{ max-width: 100%; display: block; }
   padding: 3px var(--s2);
   border-radius: var(--r-sm);
 }
+.active-account-platform-label{ margin: 0 0 var(--s2); }
 .page-head h1{
   font-size: clamp(30px, 3.6vw, 42px);
   display: flex; align-items: center; gap: var(--s3);
@@ -629,6 +640,7 @@ tr.peak td:first-child{ box-shadow: inset 2px 0 0 var(--accent); }
   border-bottom: 1px solid var(--border);
 }
 .viewall-title{ display: flex; align-items: center; gap: var(--s3); }
+.viewall-title-copy{ min-width: 0; }
 .viewall-title h2{ font-size: 21px; }
 .viewall-channel .kpi-grid{ margin-bottom: var(--s5); }
 .viewall-channel .kpi{ background: var(--surface-sunk); box-shadow: none; }
