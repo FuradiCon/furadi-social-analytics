@@ -374,7 +374,7 @@ img{ max-width: 100%; display: block; }
 }
 
 /* ---- comments ---- */
-.comment-list{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); }
+.comment-list{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--s3); }
 .comment-item{
   display: flex; gap: var(--s3);
   background: var(--surface-translucent);

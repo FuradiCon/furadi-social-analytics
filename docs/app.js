@@ -292,15 +292,25 @@ function renderTopVideos(ch){
 }
 
 /* ---------- Recent comments ---------- */
-function commentTextId(ch, index){
-  return `comment-${String(ch.slug || 'channel').replace(/[^a-z0-9_-]/gi, '-')}-${index}-text`;
+let commentRenderSequence = 0;
+let commentDisclosureRaf = null;
+
+function commentTextId(ch, renderContext, index){
+  return `comment-${renderContext}-${String(ch.slug || 'channel').replace(/[^a-z0-9_-]/gi, '-')}-${index}-text`;
 }
 
 function commentsHtml(ch){
   if(!ch.comments || !ch.comments.length) return null;
-  return ch.comments.map((c, index) => {
-    const textId = commentTextId(ch, index);
+  const renderContext = ++commentRenderSequence;
+  const comments = [...ch.comments].sort((a, b) => {
+    const awaitingOrder = Number(Boolean(b.awaitingReply)) - Number(Boolean(a.awaitingReply));
+    if(awaitingOrder) return awaitingOrder;
+    return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+  });
+  return comments.map((c, index) => {
+    const textId = commentTextId(ch, renderContext, index);
     const author = escapeHtml(c.author);
+    const reviewDestination = c.commentUrl || c.videoUrl;
     return `
     <article class="comment-item${c.awaitingReply ? ' awaiting' : ''}" tabindex="-1">
       ${c.avatar
@@ -312,12 +322,14 @@ function commentsHtml(ch){
           <span class="comment-time">${timeAgo(c.publishedAt)}</span>
           ${c.awaitingReply ? '<span class="comment-flag">Needs reply</span>' : ''}
         </div>
-        <p class="comment-text is-clamped" id="${textId}">${escapeHtml(c.text)}</p>
+        <p class="comment-text" id="${textId}">${escapeHtml(c.text)}</p>
         <div class="comment-footer">
           <span>${fmtInt(c.likes)} likes</span>
           ${c.videoUrl ? `<a href="${escapeHtml(c.videoUrl)}" target="_blank" rel="noopener noreferrer">Open video</a>` : ''}
           <button class="comment-action comment-expand" type="button" hidden aria-expanded="false" aria-controls="${textId}" aria-label="Show full comment from ${author}">Show more</button>
-          ${c.awaitingReply ? `<button class="comment-action comment-review" type="button" aria-label="Review comment from ${author}">Review comment</button><span class="comment-review-status" aria-live="polite"></span>` : ''}
+          ${c.awaitingReply ? (reviewDestination
+            ? `<a class="comment-action comment-review" href="${escapeHtml(reviewDestination)}" target="_blank" rel="noopener noreferrer" aria-label="Review comment from ${author}">Review comment</a>`
+            : `<button class="comment-action comment-review-local" type="button" aria-label="Review comment from ${author}">Review comment</button><span class="comment-review-status" aria-live="polite"></span>`) : ''}
         </div>
       </div>
     </article>`;
@@ -325,14 +337,43 @@ function commentsHtml(ch){
 }
 
 function updateCommentDisclosures(scope){
-  scope.querySelectorAll('.comment-text.is-clamped').forEach(text => {
+  scope.querySelectorAll('.comment-text').forEach(text => {
     const button = text.parentElement.querySelector('.comment-expand');
-    if(button) button.hidden = text.scrollHeight <= text.clientHeight + 1;
+    if(!button) return;
+
+    const expanded = button.getAttribute('aria-expanded') === 'true';
+    text.classList.remove('is-clamped');
+    button.hidden = true;
+    const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
+    const hasOverflow = Number.isFinite(lineHeight) && text.scrollHeight > lineHeight * 3 + 1;
+    if(!hasOverflow){
+      button.setAttribute('aria-expanded', 'false');
+      return;
+    }
+
+    button.hidden = false;
+    if(!expanded) text.classList.add('is-clamped');
   });
 }
 
 function scheduleCommentDisclosures(scope){
-  requestAnimationFrame(() => updateCommentDisclosures(scope));
+  if(commentDisclosureRaf) cancelAnimationFrame(commentDisclosureRaf);
+  commentDisclosureRaf = requestAnimationFrame(() => {
+    commentDisclosureRaf = null;
+    if(scope.offsetParent !== null) updateCommentDisclosures(scope);
+  });
+}
+
+function wireCommentDisclosureMeasurements(){
+  window.addEventListener('resize', () => {
+    if(commentDisclosureRaf) cancelAnimationFrame(commentDisclosureRaf);
+    commentDisclosureRaf = requestAnimationFrame(() => {
+      commentDisclosureRaf = null;
+      document.querySelectorAll('.comment-list').forEach(scope => {
+        if(scope.offsetParent !== null) updateCommentDisclosures(scope);
+      });
+    });
+  });
 }
 
 function wireCommentActions(){
@@ -349,7 +390,7 @@ function wireCommentActions(){
       return;
     }
 
-    const reviewButton = event.target.closest('.comment-review');
+    const reviewButton = event.target.closest('.comment-review-local');
     if(reviewButton){
       const card = reviewButton.closest('.comment-item');
       card.classList.add('is-under-review');
@@ -1418,6 +1459,7 @@ async function init(){
   buildRail();
   wireAccountDrawer();
   wireTabs();
+  wireCommentDisclosureMeasurements();
   // Steadfast Counter sits first in the rail, but Furad Ride stays the
   // default landing view — fall back to index 0 if it's ever missing.
   const defaultIdx = Math.max(0, CHANNELS.findIndex(ch => ch.slug === 'furad-ride'));
