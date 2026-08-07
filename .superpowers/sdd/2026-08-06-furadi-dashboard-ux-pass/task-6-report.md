@@ -16,12 +16,20 @@
 - `docs/attention-summary.test.mjs`
 - `.superpowers/sdd/2026-08-06-furadi-dashboard-ux-pass/task-6-report.md`
 
+## Review Fix Round
+
+- Attention ordering now derives an explicit priority from generated attention reasons: reply/new-comment signals first, decline/down signals next, and positive or no-issue signals lower. Generated priority wins ties over local trend fallback, then original account order makes remaining ties deterministic.
+- Account totals now require each contributing field to be present and numeric. Missing YouTube daily fields or Instagram likes/comments render as an em dash, while explicitly present zero values remain zero.
+- At the existing mobile breakpoint, the summary becomes stacked account cards with visible per-metric labels. It has no fixed table width or sticky columns, so the account/reason card fits within the approximately 324px inner width at a 390px viewport.
+- The focused Node fixture now covers metadata-reason ordering, missing-field availability, legitimate zero values, and the narrow-layout card assumptions.
+
 ## Verification
 
 - `node docs/attention-summary.test.mjs` — passed.
 - `node docs/platform-label.test.mjs` — passed.
 - `node --check docs/app.js` — passed.
 - `git diff --check` — passed; Git emitted only the repository's existing LF-to-CRLF conversion notices.
+- Review-fix verification reran `node docs/attention-summary.test.mjs` and `node --check docs/app.js` after the changes.
 - Puppeteer/browser automation was not run, per task instructions.
 
 ## Scope and Concerns

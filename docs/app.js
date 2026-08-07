@@ -750,7 +750,30 @@ function renderChannel(idx){
 
 /* ---------- All-accounts attention summary ---------- */
 function sumAccountRows(account, key){
-  return (account.data || []).reduce((total, row) => total + (Number(row[key]) || 0), 0);
+  const rows = Array.isArray(account.data) ? account.data : [];
+  if(!rows.length) return null;
+  let total = 0;
+  for(const row of rows){
+    const value = row && row[key];
+    if(typeof value !== 'number' || !Number.isFinite(value)) return null;
+    total += value;
+  }
+  return total;
+}
+
+function numericField(record, key){
+  const value = record && record[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function sumNumericFields(record, keys){
+  const values = keys.map(key => numericField(record, key));
+  return values.every(value => value !== null) ? values.reduce((total, value) => total + value, 0) : null;
+}
+
+function sumAccountFields(account, keys){
+  const values = keys.map(key => sumAccountRows(account, key));
+  return values.every(value => value !== null) ? values.reduce((total, value) => total + value, 0) : null;
 }
 
 function attentionMetric(label, value){
@@ -790,39 +813,63 @@ function attentionMetadataReasons(account){
     .map(value => value.trim());
 }
 
+function attentionReasonPriority(reasons){
+  if(!reasons.length) return null;
+  const text = reasons.join(' ').toLowerCase();
+  if(/needs?\s+reply|reply\b|new comments?/.test(text)) return 0;
+  if(/down|declin|drop|decreas|loss|lost|negative/.test(text)) return 1;
+  if(/up|best|growth|increas|positive|no immediate issue|no issue|flat/.test(text)) return 3;
+  return 2;
+}
+
+function fallbackAttentionPriority(trend){
+  if(trend.value < 0) return 1;
+  if(trend.value > 0) return 3;
+  return 2;
+}
+
 function buildAttentionRows(accounts){
   return accounts.map((account, index) => {
-    const rows = account.data || [];
     const instagram = isInstagramSummary(account);
     const youtube = !instagram && !isTraffic(account);
-    const currentViews = rows.length ? sumAccountRows(account, 'views') : null;
-    const currentMinutes = youtube && rows.length ? sumAccountRows(account, 'min') : null;
-    const currentEngagement = youtube && rows.length
-      ? sumAccountRows(account, 'likes') + sumAccountRows(account, 'comments') + sumAccountRows(account, 'shares')
+    const currentViews = sumAccountRows(account, 'views');
+    const currentMinutes = youtube ? sumAccountRows(account, 'min') : null;
+    const currentEngagement = youtube
+      ? sumAccountFields(account, ['likes', 'comments', 'shares'])
       : instagram && account.totals
-        ? (Number(account.totals.likes) || 0) + (Number(account.totals.comments) || 0)
+        ? sumNumericFields(account.totals, ['likes', 'comments'])
         : null;
-    const currentAudienceChange = youtube && rows.length
-      ? sumAccountRows(account, 'subG') - sumAccountRows(account, 'subL')
-      : null;
+    const subscriberGained = youtube ? sumAccountRows(account, 'subG') : null;
+    const subscriberLost = youtube ? sumAccountRows(account, 'subL') : null;
+    const currentAudienceChange = subscriberGained === null || subscriberLost === null
+      ? null
+      : subscriberGained - subscriberLost;
     const previousActivity = instagram
-      ? account.priorTotals && ((Number(account.priorTotals.likes) || 0) + (Number(account.priorTotals.comments) || 0))
-      : account.prior && account.prior.views;
+      ? sumNumericFields(account.priorTotals, ['likes', 'comments'])
+      : numericField(account.prior, 'views');
     const trendLabel = instagram ? 'Engagement' : isTraffic(account) ? 'Page views' : 'Views';
     const trend = attentionTrend(trendLabel, instagram ? currentEngagement : currentViews, previousActivity);
-    const reasons = attentionMetadataReasons(account);
+    const generatedReasons = attentionMetadataReasons(account);
+    const reasons = [...generatedReasons];
     if(account.hasNewComments && !reasons.includes('Needs reply: new comments')) reasons.push('Needs reply: new comments');
     if(trend.value < 0 && !reasons.includes(trend.label)) reasons.push(trend.label);
     if(!reasons.length) reasons.push('No immediate issue');
+    const generatedPriority = attentionReasonPriority([
+      ...generatedReasons,
+      ...(account.hasNewComments ? ['Needs reply: new comments'] : []),
+    ]);
+    const attentionPriority = generatedPriority === null ? fallbackAttentionPriority(trend) : generatedPriority;
 
     return {
       index,
       name: account.name || 'Unnamed account',
       platform: platformLabel(account),
       hasNewComments: !!account.hasNewComments,
+      attentionPriority,
+      attentionPrioritySource: generatedPriority === null ? 'fallback' : 'generated',
       activity: attentionMetric(
         instagram ? 'Posts' : isTraffic(account) ? 'Page views' : 'Views',
-        instagram ? account.totals && account.totals.posts : currentViews == null ? null : fmtInt(currentViews)
+        instagram ? numericField(account.totals, 'posts') : currentViews == null ? null : fmtInt(currentViews)
       ),
       watchTime: attentionMetric(
         'Watch time',
@@ -837,10 +884,11 @@ function buildAttentionRows(accounts){
       reasons,
     };
   }).sort((left, right) => {
-    const priority = row => row.hasNewComments ? 0 : row.trend.value < 0 ? 1 : row.trend.value > 0 ? 2 : 3;
-    const priorityDifference = priority(left) - priority(right);
+    const priorityDifference = left.attentionPriority - right.attentionPriority;
     if(priorityDifference) return priorityDifference;
-    if(left.trend.value !== null && right.trend.value !== null) return right.trend.value - left.trend.value;
+    if(left.attentionPrioritySource !== right.attentionPrioritySource){
+      return left.attentionPrioritySource === 'generated' ? -1 : 1;
+    }
     return left.index - right.index;
   });
 }
@@ -856,11 +904,11 @@ function attentionSummaryHtml(rows){
       const trend = row.trend.value === null || row.reasons.includes(row.trend.label) ? '' : `<span class="attention-trend">${escapeHtml(row.trend.label)}</span>`;
       return `<tr>
         <th scope="row"><button class="attention-account-button" type="button" data-account-index="${row.index}" aria-label="Open ${escapeHtml(row.name)} account"><span>${escapeHtml(row.name)}</span><span class="account-platform-label">${row.platform}</span></button></th>
-        <td><span class="attention-reasons">${row.reasons.map(escapeHtml).join(' · ')}</span>${trend}</td>
-        <td>${attentionMetricHtml(row.activity)}</td>
-        <td>${attentionMetricHtml(row.watchTime)}</td>
-        <td>${attentionMetricHtml(row.engagement)}</td>
-        <td>${attentionMetricHtml(row.audienceChange)}</td>
+        <td data-label="Attention"><span class="attention-reasons">${row.reasons.map(escapeHtml).join(' · ')}</span>${trend}</td>
+        <td data-label="Views / activity">${attentionMetricHtml(row.activity)}</td>
+        <td data-label="Watch time">${attentionMetricHtml(row.watchTime)}</td>
+        <td data-label="Engagement">${attentionMetricHtml(row.engagement)}</td>
+        <td data-label="Audience change">${attentionMetricHtml(row.audienceChange)}</td>
       </tr>`;
     }).join('')}</tbody>
   </table>`;

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(path.join(root, "app.js"), "utf8");
+const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
 const helpers = source.slice(
   source.indexOf("/* ---------- All-accounts attention summary ---------- */"),
   source.indexOf("/* ---------- All accounts at once ---------- */")
@@ -62,21 +63,97 @@ const rows = buildAttentionRows([
   },
 ]);
 
-assert.deepEqual(rows.map(row => row.name), ["Furad Ride", "<Furadi>", "Steadfast Counter"]);
+assert.deepEqual(rows.map(row => row.name), ["Furad Ride", "Steadfast Counter", "<Furadi>"]);
 assert.deepEqual(plain(rows[0].reasons), ["Needs reply: new comments", "Views down 40%"]);
 assert.deepEqual(plain(rows[0].activity), { label: "Views", value: "60" });
 assert.deepEqual(plain(rows[0].watchTime), { label: "Watch time", value: "2h 0m" });
 assert.deepEqual(plain(rows[0].engagement), { label: "Engagement", value: "7" });
 assert.deepEqual(plain(rows[0].audienceChange), { label: "Subscriber change", value: "+4" });
-assert.deepEqual(plain(rows[1].activity), { label: "Posts", value: "2" });
+assert.deepEqual(plain(rows[1].activity), { label: "Page views", value: "42" });
 assert.equal(rows[1].watchTime.value, "—");
-assert.deepEqual(plain(rows[1].engagement), { label: "Engagement", value: "120" });
+assert.equal(rows[1].engagement.value, "—");
 assert.equal(rows[1].audienceChange.value, "—");
-assert.equal(rows[1].trend.label, "Engagement up 50%");
-assert.deepEqual(plain(rows[2].activity), { label: "Page views", value: "42" });
+assert.deepEqual(plain(rows[2].activity), { label: "Posts", value: "2" });
 assert.equal(rows[2].watchTime.value, "—");
-assert.equal(rows[2].engagement.value, "—");
+assert.deepEqual(plain(rows[2].engagement), { label: "Engagement", value: "120" });
 assert.equal(rows[2].audienceChange.value, "—");
+assert.equal(rows[2].trend.label, "Engagement up 50%");
+
+const reasonOrderedRows = buildAttentionRows([
+  {
+    name: "Local decline",
+    platform: "YouTube",
+    accountType: "Channel",
+    data: [{ views: 50, min: 0, likes: 0, comments: 0, shares: 0, subG: 0, subL: 0 }],
+    prior: { views: 100 },
+  },
+  {
+    name: "Positive metadata",
+    platform: "YouTube",
+    accountType: "Channel",
+    attentionReasons: ["Best period in 28 days"],
+    data: [{ views: 10, min: 0, likes: 0, comments: 0, shares: 0, subG: 0, subL: 0 }],
+  },
+  {
+    name: "Generated decline",
+    platform: "YouTube",
+    accountType: "Channel",
+    attentionReasons: ["Views down 12%"],
+    data: [{ views: 10, min: 0, likes: 0, comments: 0, shares: 0, subG: 0, subL: 0 }],
+  },
+  {
+    name: "Generated reply",
+    platform: "YouTube",
+    accountType: "Channel",
+    attentionReasons: ["Needs reply: new comments"],
+    data: [{ views: 10, min: 0, likes: 0, comments: 0, shares: 0, subG: 0, subL: 0 }],
+  },
+]);
+
+assert.deepEqual(reasonOrderedRows.map(row => row.name), [
+  "Generated reply",
+  "Generated decline",
+  "Local decline",
+  "Positive metadata",
+]);
+assert.equal(reasonOrderedRows[0].attentionPriority, 0);
+assert.equal(reasonOrderedRows[1].attentionPriority, 1);
+
+const availabilityRows = buildAttentionRows([
+  {
+    name: "Legitimate zeros",
+    platform: "YouTube",
+    accountType: "Channel",
+    data: [{ views: 0, min: 0, likes: 0, comments: 0, shares: 0, subG: 0, subL: 0 }],
+  },
+  {
+    name: "Incomplete YouTube",
+    platform: "YouTube",
+    accountType: "Channel",
+    data: [
+      { views: 0, min: 0, likes: 0, comments: 0, shares: 0, subG: 0, subL: 0 },
+      { views: 5, min: 5, likes: 2, comments: 1, subG: 1 },
+    ],
+  },
+  {
+    name: "Incomplete Instagram",
+    platform: "Instagram",
+    accountType: "Profile",
+    totals: { posts: 1, likes: 4 },
+  },
+]);
+
+const zeroRow = availabilityRows.find(row => row.name === "Legitimate zeros");
+assert.deepEqual(plain(zeroRow.activity), { label: "Views", value: "0" });
+assert.deepEqual(plain(zeroRow.watchTime), { label: "Watch time", value: "0h 0m" });
+assert.deepEqual(plain(zeroRow.engagement), { label: "Engagement", value: "0" });
+assert.deepEqual(plain(zeroRow.audienceChange), { label: "Subscriber change", value: "+0" });
+const incompleteYoutube = availabilityRows.find(row => row.name === "Incomplete YouTube");
+assert.equal(incompleteYoutube.activity.value, "5");
+assert.equal(incompleteYoutube.engagement.value, "—");
+assert.equal(incompleteYoutube.audienceChange.value, "—");
+const incompleteInstagram = availabilityRows.find(row => row.name === "Incomplete Instagram");
+assert.equal(incompleteInstagram.engagement.value, "—");
 
 const html = attentionSummaryHtml(rows);
 assert.match(html, /<table/);
@@ -85,5 +162,10 @@ assert.match(html, /data-account-index="1"/);
 assert.match(html, /Open Furad Ride account/);
 assert.match(html, /&lt;Furadi&gt;/);
 assert.match(html, />—</);
+assert.match(html, /data-label="Attention"/);
+
+const mobileStyles = styles.slice(styles.indexOf("@media (max-width: 760px){"));
+assert.match(mobileStyles, /\.attention-summary-table\{ min-width: 0; width: 100%; \}/);
+assert.doesNotMatch(mobileStyles, /\.attention-summary-table[^}]*position: sticky/);
 
 console.log("attention summary fixture passed");

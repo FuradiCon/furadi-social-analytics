@@ -851,19 +851,35 @@ body.bg-matrix-active{ background: #000; }
   .table-scroll{ overflow-x: auto; max-width: 100%; }
   .attention-summary{ padding: var(--s4); }
   .attention-summary-head{ align-items: flex-start; }
-  .attention-summary-table{ min-width: 820px; }
-  .attention-summary-table thead th:first-child,
-  .attention-summary-table tbody th{
-    position: sticky; left: 0; z-index: 3;
-    background: var(--surface);
+  .attention-summary-scroll{ overflow: visible; }
+  .attention-summary-table{ min-width: 0; width: 100%; }
+  .attention-summary-table thead{
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
   }
-  .attention-summary-table thead th:nth-child(2),
-  .attention-summary-table tbody td:nth-child(2){
-    position: sticky; left: var(--attention-account-col); z-index: 2;
-    background: var(--surface);
+  .attention-summary-table,
+  .attention-summary-table tbody,
+  .attention-summary-table tr,
+  .attention-summary-table th,
+  .attention-summary-table td{ display: block; width: 100%; }
+  .attention-summary-table tbody tr{
+    margin-bottom: var(--s3); padding: var(--s3);
+    border: 1px solid var(--border); border-radius: var(--r-md);
   }
+  .attention-summary-table tbody th,
+  .attention-summary-table tbody td{
+    position: static; min-width: 0; padding: var(--s2) 0;
+    background: transparent; border: 0; white-space: normal;
+  }
+  .attention-summary-table tbody th{ padding-top: 0; }
+  .attention-summary-table tbody td::before{
+    content: attr(data-label); display: block; margin-bottom: 2px;
+    color: var(--text-secondary); font-size: 10px; letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .attention-summary-table .attention-metric-label{ display: none; }
   .attention-summary-table tbody tr:nth-child(even) th,
-  .attention-summary-table tbody tr:nth-child(even) td:nth-child(2){ background: var(--surface-sunk); }
+  .attention-summary-table tbody tr:nth-child(even) td{ background: transparent; }
 }
 
 @media (prefers-reduced-motion: reduce){
