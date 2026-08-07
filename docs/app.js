@@ -4,6 +4,7 @@
 
 let CHANNELS = [];
 let activeIdx = 'all';
+let dashboardPayload = null;
 
 function isAccountDrawerMode(){ return window.matchMedia('(max-width: 760px)').matches; }
 
@@ -67,6 +68,48 @@ function timeAgo(iso){
   return fmtDay(iso.slice(0,10));
 }
 function plural(n, word){ return fmtInt(n) + ' ' + word + (Math.abs(n) === 1 ? '' : 's'); }
+
+function parseBuildTimestamp(value){
+  if(typeof value !== 'string' || !value.trim()) return null;
+  const normalized = value.trim().replace(/^([0-9]{4}-[0-9]{2}-[0-9]{2})\s+/, '$1T').replace(/\s+UTC$/, 'Z');
+  const timestamp = new Date(normalized);
+  return Number.isNaN(timestamp.getTime()) ? null : timestamp;
+}
+
+function formatRelativeUpdate(lastBuiltAt, now = new Date()){
+  const timestamp = parseBuildTimestamp(lastBuiltAt);
+  const current = now instanceof Date ? now : parseBuildTimestamp(now);
+  if(!timestamp || !current) return { label:'Update time unavailable', stale:false, exact:'' };
+  const elapsedSeconds = Math.max(0, Math.floor((current.getTime() - timestamp.getTime()) / 1000));
+  const stale = elapsedSeconds >= 2 * 60 * 60;
+  let relative;
+  if(elapsedSeconds < 60) relative = 'just now';
+  else if(elapsedSeconds < 60 * 60) relative = Math.floor(elapsedSeconds / 60) + ' minute' + (Math.floor(elapsedSeconds / 60) === 1 ? '' : 's') + ' ago';
+  else if(elapsedSeconds < 24 * 60 * 60) relative = Math.floor(elapsedSeconds / (60 * 60)) + ' hour' + (Math.floor(elapsedSeconds / (60 * 60)) === 1 ? '' : 's') + ' ago';
+  else relative = Math.floor(elapsedSeconds / (24 * 60 * 60)) + ' day' + (Math.floor(elapsedSeconds / (24 * 60 * 60)) === 1 ? '' : 's') + ' ago';
+  return { label:'Updated ' + relative, stale, exact:timestamp.toISOString() };
+}
+
+function reportingWindowContext(ch){
+  const rows = Array.isArray(ch && ch.data) ? ch.data : [];
+  const datedRows = rows.filter(row => /^\d{4}-\d{2}-\d{2}$/.test(row && row.d));
+  if(!datedRows.length) return [];
+  const latestDay = datedRows.reduce((latest, row) => row.d > latest ? row.d : latest, datedRows[0].d);
+  return ['Data through ' + fmtDay(latestDay), datedRows.length + ' complete day' + (datedRows.length === 1 ? '' : 's')];
+}
+
+function renderFreshnessStatus(data, now = new Date()){
+  const el = document.getElementById('freshnessStatus');
+  if(!el) return;
+  const timestamp = data && (parseBuildTimestamp(data.lastBuiltAt) ? data.lastBuiltAt : data.generatedAt);
+  const freshness = formatRelativeUpdate(timestamp, now);
+  const ch = typeof activeIdx === 'number' ? data && data.channels && data.channels[activeIdx] : null;
+  const parts = [freshness.stale ? 'Stale' : '', freshness.label, ...reportingWindowContext(ch)].filter(Boolean);
+  el.textContent = parts.join(' · ');
+  el.title = freshness.exact ? 'Last built ' + freshness.exact : '';
+  el.classList.toggle('is-warning', freshness.label === 'Update time unavailable');
+  el.classList.toggle('is-stale', freshness.stale);
+}
 
 /* Rounds an axis maximum up so that `ticks` evenly spaced gridlines all land on
    whole numbers — every metric here is a count, so "0 · 2 · 3 · 5" style axes
@@ -569,6 +612,7 @@ function renderChannel(idx){
 
   document.querySelector('.eyebrow').textContent = ch.name;
   document.querySelector('.date-range').textContent = ch.dateRangeIso || 'No data yet';
+  renderFreshnessStatus(dashboardPayload);
   // Instagram ships period totals and traffic ships page views, neither is a
   // per-video daily series — don't promise a "Daily performance" view for them.
   document.querySelector('.page-head h1').firstChild.nodeValue = ig ? 'Account performance' : traffic ? 'Page performance' : 'Daily performance';
@@ -1306,6 +1350,7 @@ async function init(){
   }
 
   CHANNELS = payload.channels || [];
+  dashboardPayload = payload;
   // Charts read oldest → newest, left to right; tables list newest first.
   CHANNELS.forEach(ch => { ch.tableRows = ch.data ? [...ch.data].reverse() : []; });
 

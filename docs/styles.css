@@ -257,6 +257,17 @@ img{ max-width: 100%; display: block; }
 .page-head-controls{
   display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
 }
+.freshness-status{
+  max-width: min(100%, 460px);
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.35;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: var(--s1) var(--s3);
+}
+.freshness-status.is-warning{ border-color: var(--accent-strong); color: var(--text-primary); }
+.freshness-status.is-stale{ border-color: var(--accent); color: var(--text-primary); }
 
 .comment-alert{
   display: none;
@@ -709,6 +720,8 @@ body.bg-matrix-active{ background: #000; }
 }
 
 @media (max-width: 760px){
+  .page-head-controls{ align-items: stretch; gap: var(--s2); }
+  .freshness-status{ flex: 1 1 100%; max-width: 100%; white-space: normal; }
   body{ overflow-x: hidden; }
   .app{
     display: block;
