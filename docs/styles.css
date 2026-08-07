@@ -374,7 +374,7 @@ img{ max-width: 100%; display: block; }
 }
 
 /* ---- comments ---- */
-.comment-list{ display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s3); }
+.comment-list{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); }
 .comment-item{
   display: flex; gap: var(--s3);
   background: var(--surface-translucent);
@@ -408,17 +408,37 @@ img{ max-width: 100%; display: block; }
   padding: 1px var(--s2); border-radius: var(--r-sm);
 }
 .comment-text{ margin: var(--s1) 0 var(--s2); font-size: 13.5px; line-height: 1.65; }
+.comment-text.is-clamped{
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
 .comment-footer{
   display: flex; gap: var(--s3); align-items: center;
+  flex-wrap: wrap;
   font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);
 }
-.comment-footer a{
+.comment-footer a,
+.comment-action{
   color: var(--ink); text-decoration: none;
+  font: inherit;
+  background: transparent;
+  border: 0;
   border-bottom: 1px solid var(--border-strong);
+  padding: 0;
+  cursor: pointer;
   transition: border-color .16s ease, opacity .16s ease;
 }
-.comment-footer a:hover{ border-bottom-color: var(--accent); }
-.comment-footer a:active{ opacity: .7; }
+.comment-footer a:hover,
+.comment-action:hover{ border-bottom-color: var(--accent); }
+.comment-footer a:active,
+.comment-action:active{ opacity: .7; }
+.comment-action:focus-visible{ outline: 2px solid var(--accent); outline-offset: 3px; }
+.comment-action:disabled{ cursor: default; opacity: .75; }
+.comment-item.is-under-review{ box-shadow: 0 0 0 2px var(--accent), var(--shadow-1); }
+.comment-review-status{ flex-basis: 100%; color: var(--accent-soft); }
 
 /* ---- videos / posts ---- */
 .video-grid{

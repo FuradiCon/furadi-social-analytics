@@ -292,26 +292,73 @@ function renderTopVideos(ch){
 }
 
 /* ---------- Recent comments ---------- */
+function commentTextId(ch, index){
+  return `comment-${String(ch.slug || 'channel').replace(/[^a-z0-9_-]/gi, '-')}-${index}-text`;
+}
+
 function commentsHtml(ch){
   if(!ch.comments || !ch.comments.length) return null;
-  return ch.comments.map(c => `
-    <article class="comment-item${c.awaitingReply ? ' awaiting' : ''}">
+  return ch.comments.map((c, index) => {
+    const textId = commentTextId(ch, index);
+    const author = escapeHtml(c.author);
+    return `
+    <article class="comment-item${c.awaitingReply ? ' awaiting' : ''}" tabindex="-1">
       ${c.avatar
         ? `<img class="comment-avatar" src="${escapeHtml(c.avatar)}" alt="" loading="lazy" />`
         : `<div class="comment-avatar comment-avatar-fallback">${escapeHtml((c.author || '?').charAt(0).toUpperCase())}</div>`}
       <div class="comment-body">
         <div class="comment-meta">
-          <span class="comment-author">${escapeHtml(c.author)}</span>
+          <span class="comment-author">${author}</span>
           <span class="comment-time">${timeAgo(c.publishedAt)}</span>
-          ${c.awaitingReply ? '<span class="comment-flag">Needs a reply</span>' : ''}
+          ${c.awaitingReply ? '<span class="comment-flag">Needs reply</span>' : ''}
         </div>
-        <p class="comment-text">${escapeHtml(c.text)}</p>
+        <p class="comment-text is-clamped" id="${textId}">${escapeHtml(c.text)}</p>
         <div class="comment-footer">
           <span>${fmtInt(c.likes)} likes</span>
           ${c.videoUrl ? `<a href="${escapeHtml(c.videoUrl)}" target="_blank" rel="noopener noreferrer">Open video</a>` : ''}
+          <button class="comment-action comment-expand" type="button" hidden aria-expanded="false" aria-controls="${textId}" aria-label="Show full comment from ${author}">Show more</button>
+          ${c.awaitingReply ? `<button class="comment-action comment-review" type="button" aria-label="Review comment from ${author}">Review comment</button><span class="comment-review-status" aria-live="polite"></span>` : ''}
         </div>
       </div>
-    </article>`).join('');
+    </article>`;
+  }).join('');
+}
+
+function updateCommentDisclosures(scope){
+  scope.querySelectorAll('.comment-text.is-clamped').forEach(text => {
+    const button = text.parentElement.querySelector('.comment-expand');
+    if(button) button.hidden = text.scrollHeight <= text.clientHeight + 1;
+  });
+}
+
+function scheduleCommentDisclosures(scope){
+  requestAnimationFrame(() => updateCommentDisclosures(scope));
+}
+
+function wireCommentActions(){
+  document.addEventListener('click', event => {
+    const expandButton = event.target.closest('.comment-expand');
+    if(expandButton){
+      const card = expandButton.closest('.comment-item');
+      const text = card.querySelector('.comment-text');
+      const expanded = expandButton.getAttribute('aria-expanded') === 'true';
+      text.classList.toggle('is-clamped', expanded);
+      expandButton.setAttribute('aria-expanded', String(!expanded));
+      expandButton.textContent = expanded ? 'Show more' : 'Show less';
+      expandButton.setAttribute('aria-label', `${expanded ? 'Show full' : 'Collapse'} comment from ${card.querySelector('.comment-author').textContent}`);
+      return;
+    }
+
+    const reviewButton = event.target.closest('.comment-review');
+    if(reviewButton){
+      const card = reviewButton.closest('.comment-item');
+      card.classList.add('is-under-review');
+      reviewButton.disabled = true;
+      reviewButton.textContent = 'In review';
+      card.querySelector('.comment-review-status').textContent = 'Marked for review.';
+      card.focus({ preventScroll:false });
+    }
+  });
 }
 
 function renderComments(ch){
@@ -321,6 +368,7 @@ function renderComments(ch){
   if(!html){ section.hidden = true; list.innerHTML = ''; return; }
   list.innerHTML = html;
   section.hidden = false;
+  scheduleCommentDisclosures(list);
 }
 
 /* ---------- Simple-channel primary chart (traffic channels' daily page views) ---------- */
@@ -686,6 +734,8 @@ function renderViewAll(){
         ${videos ? `<p class="section-label">${videos.label}</p><div class="video-grid">${videos.html}</div>` : ''}
       </section>`;
   }).join('');
+
+  scheduleCommentDisclosures(wrap);
 
   animateKpiValues(wrap);
   CHANNELS.forEach((ch,i) => {
@@ -1372,6 +1422,7 @@ async function init(){
   // default landing view — fall back to index 0 if it's ever missing.
   const defaultIdx = Math.max(0, CHANNELS.findIndex(ch => ch.slug === 'furad-ride'));
   renderChannel(defaultIdx);
+  wireCommentActions();
 }
 
 document.addEventListener('DOMContentLoaded', () => { initBackground(); wireBackgroundControls(); init(); });
