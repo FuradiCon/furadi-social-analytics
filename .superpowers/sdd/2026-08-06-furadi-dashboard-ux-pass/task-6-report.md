@@ -23,6 +23,12 @@
 - At the existing mobile breakpoint, the summary becomes stacked account cards with visible per-metric labels. It has no fixed table width or sticky columns, so the account/reason card fits within the approximately 324px inner width at a 390px viewport.
 - The focused Node fixture now covers metadata-reason ordering, missing-field availability, legitimate zero values, and the narrow-layout card assumptions.
 
+## Final Ordering Fix
+
+- Fallback ordering is now explicit: attention issues first, negative trends next, comparable positive trends in descending percentage order, then neutral or unavailable comparisons.
+- Generated attention metadata remains the primary ordering signal and wins ties against fallback trend ordering.
+- The focused fixture adds a neutral, unavailable, +20%, and +50% set to keep positive trends ahead of neutral/unavailable rows and verify strongest-positive-first ordering.
+
 ## Verification
 
 - `node docs/attention-summary.test.mjs` — passed.

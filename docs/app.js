@@ -824,8 +824,8 @@ function attentionReasonPriority(reasons){
 
 function fallbackAttentionPriority(trend){
   if(trend.value < 0) return 1;
-  if(trend.value > 0) return 3;
-  return 2;
+  if(trend.value > 0) return 2;
+  return 3;
 }
 
 function buildAttentionRows(accounts){
@@ -888,6 +888,9 @@ function buildAttentionRows(accounts){
     if(priorityDifference) return priorityDifference;
     if(left.attentionPrioritySource !== right.attentionPrioritySource){
       return left.attentionPrioritySource === 'generated' ? -1 : 1;
+    }
+    if(left.attentionPrioritySource === 'fallback' && left.attentionPriority === 2){
+      return right.trend.value - left.trend.value;
     }
     return left.index - right.index;
   });

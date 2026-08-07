@@ -63,21 +63,21 @@ const rows = buildAttentionRows([
   },
 ]);
 
-assert.deepEqual(rows.map(row => row.name), ["Furad Ride", "Steadfast Counter", "<Furadi>"]);
+assert.deepEqual(rows.map(row => row.name), ["Furad Ride", "<Furadi>", "Steadfast Counter"]);
 assert.deepEqual(plain(rows[0].reasons), ["Needs reply: new comments", "Views down 40%"]);
 assert.deepEqual(plain(rows[0].activity), { label: "Views", value: "60" });
 assert.deepEqual(plain(rows[0].watchTime), { label: "Watch time", value: "2h 0m" });
 assert.deepEqual(plain(rows[0].engagement), { label: "Engagement", value: "7" });
 assert.deepEqual(plain(rows[0].audienceChange), { label: "Subscriber change", value: "+4" });
-assert.deepEqual(plain(rows[1].activity), { label: "Page views", value: "42" });
+assert.deepEqual(plain(rows[1].activity), { label: "Posts", value: "2" });
 assert.equal(rows[1].watchTime.value, "—");
-assert.equal(rows[1].engagement.value, "—");
+assert.deepEqual(plain(rows[1].engagement), { label: "Engagement", value: "120" });
 assert.equal(rows[1].audienceChange.value, "—");
-assert.deepEqual(plain(rows[2].activity), { label: "Posts", value: "2" });
+assert.equal(rows[1].trend.label, "Engagement up 50%");
+assert.deepEqual(plain(rows[2].activity), { label: "Page views", value: "42" });
 assert.equal(rows[2].watchTime.value, "—");
-assert.deepEqual(plain(rows[2].engagement), { label: "Engagement", value: "120" });
+assert.equal(rows[2].engagement.value, "—");
 assert.equal(rows[2].audienceChange.value, "—");
-assert.equal(rows[2].trend.label, "Engagement up 50%");
 
 const reasonOrderedRows = buildAttentionRows([
   {
@@ -118,6 +118,43 @@ assert.deepEqual(reasonOrderedRows.map(row => row.name), [
 ]);
 assert.equal(reasonOrderedRows[0].attentionPriority, 0);
 assert.equal(reasonOrderedRows[1].attentionPriority, 1);
+
+const fallbackTrendRows = buildAttentionRows([
+  {
+    name: "Neutral comparison",
+    platform: "YouTube",
+    accountType: "Channel",
+    data: [{ views: 100, min: 0, likes: 0, comments: 0, shares: 0, subG: 0, subL: 0 }],
+    prior: { views: 100 },
+  },
+  {
+    name: "Positive 20",
+    platform: "YouTube",
+    accountType: "Channel",
+    data: [{ views: 120, min: 0, likes: 0, comments: 0, shares: 0, subG: 0, subL: 0 }],
+    prior: { views: 100 },
+  },
+  {
+    name: "Positive 50",
+    platform: "YouTube",
+    accountType: "Channel",
+    data: [{ views: 150, min: 0, likes: 0, comments: 0, shares: 0, subG: 0, subL: 0 }],
+    prior: { views: 100 },
+  },
+  {
+    name: "No comparison",
+    platform: "YouTube",
+    accountType: "Channel",
+    data: [{ views: 75, min: 0, likes: 0, comments: 0, shares: 0, subG: 0, subL: 0 }],
+  },
+]);
+
+assert.deepEqual(fallbackTrendRows.map(row => row.name), [
+  "Positive 50",
+  "Positive 20",
+  "Neutral comparison",
+  "No comparison",
+]);
 
 const availabilityRows = buildAttentionRows([
   {
