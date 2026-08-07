@@ -13,6 +13,7 @@ if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
 from scripts.datawindow import window_dates, prior_window_dates
+from scripts.dashboard_metadata import attach_account_metadata, build_dashboard_metadata
 from scripts.youtube_pipeline import fetch_channel_bundle
 from scripts.instagram_pipeline import fetch_instagram_bundle
 from scripts.steadfast_pipeline import fetch_steadfast_bundle
@@ -22,15 +23,19 @@ DEFAULT_OUT_DIR = os.path.join(SCRIPT_DIR, "docs")
 CHANNEL_CFGS = [
     {"slug": "furad-ride", "channel_id": "UCIwPYOvVPjta-RfrdrlzSEg",
      "token_path": os.path.join(SCRIPT_DIR, "token_group_a_furadride.json"),
+     "platform": "YouTube", "accountType": "Channel",
      "accent": {"accent": "#FF5A00", "accentStrong": "#FFB37A", "accentSoft": "#4A2410"}},
     {"slug": "furadi", "channel_id": "UCwu8ErWfd6xiz-OS4dEfCUQ",
      "token_path": os.path.join(SCRIPT_DIR, "token_group_b_furadi_desertworks.json"),
+     "platform": "YouTube", "accountType": "Channel",
      "accent": {"accent": "#00E5FF", "accentStrong": "#8FF3FF", "accentSoft": "#0A3A40"}},
     {"slug": "furadi-desert-works", "channel_id": "UCQPFdhFvSUO_C3uoxDh1tzA",
      "token_path": os.path.join(SCRIPT_DIR, "token_group_b_furadi_desertworks.json"),
+     "platform": "YouTube", "accountType": "Channel",
      "accent": {"accent": "#39FF14", "accentStrong": "#A6FF8C", "accentSoft": "#123312"}},
     {"slug": "furadi-games", "channel_id": "UCq9jOtMkVuEs8OaX34wPWNg",
      "token_path": os.path.join(SCRIPT_DIR, "token_group_c_furadigames.json"),
+     "platform": "YouTube", "accountType": "Channel",
      "accent": {"accent": "#FFEB00", "accentStrong": "#FFF7A3", "accentSoft": "#3D3900"}},
 ]
 
@@ -77,6 +82,7 @@ def build(channel_cfgs=None, channel_fetcher=fetch_channel_bundle,
     out_dir = out_dir or DEFAULT_OUT_DIR
     assets_dir = os.path.join(out_dir, "assets")
     os.makedirs(assets_dir, exist_ok=True)
+    built_at = datetime.datetime.now(datetime.timezone.utc)
 
     start, end = window_dates()
     prior_start, prior_end = prior_window_dates(start)
@@ -89,7 +95,7 @@ def build(channel_cfgs=None, channel_fetcher=fetch_channel_bundle,
     # traffic, not a YouTube/Instagram account, so a fetch failure here must
     # never sink the rest of the dashboard build.
     try:
-        channels_data.append(steadfast_fetcher())
+        channels_data.append(attach_account_metadata(steadfast_fetcher()))
         any_success = True
     except Exception as e:
         print(f"[Steadfast Counter] FAILED: {e}")
@@ -97,7 +103,7 @@ def build(channel_cfgs=None, channel_fetcher=fetch_channel_bundle,
     for cfg in channel_cfgs:
         try:
             bundle = channel_fetcher(cfg, start, end, prior_start, prior_end)
-            channels_data.append(bundle)
+            channels_data.append(attach_account_metadata(bundle))
             any_success = True
         except Exception as e:
             print(f"[{cfg['slug']}] FAILED: {e}")
@@ -105,7 +111,7 @@ def build(channel_cfgs=None, channel_fetcher=fetch_channel_bundle,
     try:
         ig_bundle = instagram_fetcher(INSTAGRAM_TOKEN_FILE, INSTAGRAM_CLIENT_SECRET_FILE)
         ig_bundle = download_instagram_thumbnails(ig_bundle, assets_dir)
-        channels_data.append(ig_bundle)
+        channels_data.append(attach_account_metadata(ig_bundle))
         any_success = True
     except Exception as e:
         print(f"[Instagram] FAILED: {e}")
@@ -114,10 +120,10 @@ def build(channel_cfgs=None, channel_fetcher=fetch_channel_bundle,
         print("All fetches failed; leaving existing data.json untouched")
         return False
 
-    payload = {
+    payload = build_dashboard_metadata({
         "generatedAt": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "channels": channels_data,
-    }
+    }, built_at=built_at)
 
     tmp_path = os.path.join(out_dir, "data.json.tmp")
     final_path = os.path.join(out_dir, "data.json")

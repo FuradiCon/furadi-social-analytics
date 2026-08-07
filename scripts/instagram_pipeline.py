@@ -93,7 +93,8 @@ def fetch_instagram_bundle(token_file, client_secret_file, window_days=28):
 
     return {
         "slug": "instagram",
-        "platform": "instagram",
+        "platform": "Instagram",
+        "accountType": "Profile",
         "name": f"@{username}",
         "url": f"https://www.instagram.com/{username}/",
         "dateRangeIso": f"{cur_start.date().isoformat()} → {now.date().isoformat()}",

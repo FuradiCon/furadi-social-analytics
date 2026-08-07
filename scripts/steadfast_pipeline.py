@@ -76,6 +76,8 @@ def fetch_steadfast_bundle(url=TRAFFIC_URL, usage_url=USAGE_URL):
         "name": "Steadfast Counter",
         "url": "https://furadicon.github.io/mens-daily/",
         "kind": "traffic",
+        "platform": "Steadfast Counter",
+        "accountType": "Website",
         "accent": ACCENT,
         "dateRangeIso": f'{window[0]["d"]} → {window[-1]["d"]}' if window else "No data yet",
         "data": [
