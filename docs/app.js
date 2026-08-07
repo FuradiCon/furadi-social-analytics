@@ -93,9 +93,17 @@ function formatRelativeUpdate(lastBuiltAt, now = new Date()){
 function reportingWindowContext(ch){
   const rows = Array.isArray(ch && ch.data) ? ch.data : [];
   const datedRows = rows.filter(row => /^\d{4}-\d{2}-\d{2}$/.test(row && row.d));
-  if(!datedRows.length) return [];
-  const latestDay = datedRows.reduce((latest, row) => row.d > latest ? row.d : latest, datedRows[0].d);
-  return ['Data through ' + fmtDay(latestDay), datedRows.length + ' complete day' + (datedRows.length === 1 ? '' : 's')];
+  const latestDay = datedRows.length
+    ? datedRows.reduce((latest, row) => row.d > latest ? row.d : latest, datedRows[0].d)
+    : null;
+  const metadataDay = /^\d{4}-\d{2}-\d{2}$/.test(ch && ch.dataThrough) ? ch.dataThrough : null;
+  const dataThrough = metadataDay && (!latestDay || metadataDay <= latestDay) ? metadataDay : latestDay;
+  const metadataDays = Number.isInteger(ch && ch.windowDays) && ch.windowDays >= 0 ? ch.windowDays : null;
+  const windowDays = metadataDays === null ? datedRows.length : metadataDays;
+  return [
+    dataThrough ? 'Data through ' + fmtDay(dataThrough) : 'Data through unavailable',
+    windowDays + ' complete day' + (windowDays === 1 ? '' : 's')
+  ];
 }
 
 function renderFreshnessStatus(data, now = new Date()){
@@ -107,6 +115,7 @@ function renderFreshnessStatus(data, now = new Date()){
   const parts = [freshness.stale ? 'Stale' : '', freshness.label, ...reportingWindowContext(ch)].filter(Boolean);
   el.textContent = parts.join(' · ');
   el.title = freshness.exact ? 'Last built ' + freshness.exact : '';
+  document.getElementById('freshnessExact').textContent = freshness.exact ? 'Exact build timestamp: ' + freshness.exact : '';
   el.classList.toggle('is-warning', freshness.label === 'Update time unavailable');
   el.classList.toggle('is-stale', freshness.stale);
 }

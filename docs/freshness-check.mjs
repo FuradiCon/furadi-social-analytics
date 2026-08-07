@@ -20,7 +20,7 @@ await new Promise(resolve => server.listen(0, resolve));
 const url = `http://127.0.0.1:${server.address().port}`;
 const browser = await puppeteer.launch();
 
-function fixture({ lastBuiltAt, generatedAt, windowDays = 99, dataThrough = "2026-08-06" } = {}) {
+function fixture({ lastBuiltAt, generatedAt, windowDays, dataThrough } = {}) {
   const payload = structuredClone(source);
   payload.lastBuiltAt = lastBuiltAt;
   payload.generatedAt = generatedAt;
@@ -29,8 +29,10 @@ function fixture({ lastBuiltAt, generatedAt, windowDays = 99, dataThrough = "202
     { d: "2026-08-03", views: 4, uniques: 2, costUsd: 0 },
     { d: "2026-08-05", views: 8, uniques: 3, costUsd: 0 },
   ];
-  first.windowDays = windowDays;
-  first.dataThrough = dataThrough;
+  if (windowDays === undefined) delete first.windowDays;
+  else first.windowDays = windowDays;
+  if (dataThrough === undefined) delete first.dataThrough;
+  else first.dataThrough = dataThrough;
   return payload;
 }
 
@@ -52,10 +54,12 @@ async function load(payload) {
 }
 
 try {
-  let page = await load(fixture({ lastBuiltAt: new Date(Date.now() - 20_000).toISOString() }));
-  let status = await page.$eval("#freshnessStatus", el => ({ text: el.textContent, exact: el.title, stale: el.classList.contains("is-stale") }));
-  assert.match(status.text, /^Updated just now · Data through Aug 5 · 2 complete days$/);
+  let page = await load(fixture({ lastBuiltAt: new Date(Date.now() - 20_000).toISOString(), windowDays: 1, dataThrough: "2026-08-05" }));
+  let status = await page.$eval("#freshnessStatus", el => ({ text: el.textContent, exact: el.title, describedBy: el.getAttribute("aria-describedby"), stale: el.classList.contains("is-stale") }));
+  assert.match(status.text, /^Updated just now · Data through Aug 5 · 1 complete day$/);
   assert.ok(status.exact, "fresh status exposes an exact build timestamp");
+  assert.equal(status.describedBy, "freshnessExact");
+  assert.match(await page.$eval("#freshnessExact", el => el.textContent), /^Exact build timestamp: 20/);
   assert.equal(status.stale, false);
   await page.close();
 
@@ -76,6 +80,9 @@ try {
   await page.click('.channel-tab-btn[data-idx="1"]');
   status = await page.$eval("#freshnessStatus", el => el.textContent);
   assert.match(status, /Data through Aug 3 · 27 complete days$/);
+  await page.click('.channel-tab-btn[data-idx="2"]');
+  status = await page.$eval("#freshnessStatus", el => el.textContent);
+  assert.equal(status, "Update time unavailable · Data through unavailable · 0 complete days");
   await page.close();
 } finally {
   await browser.close();
