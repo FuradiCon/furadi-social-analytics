@@ -5,6 +5,44 @@
 let CHANNELS = [];
 let activeIdx = 'all';
 
+function isAccountDrawerMode(){ return window.matchMedia('(max-width: 760px)').matches; }
+
+function openAccountDrawer(){
+  if(!isAccountDrawerMode()) return;
+  document.querySelector('.rail').classList.add('is-open');
+  document.getElementById('accountDrawerBackdrop').hidden = false;
+  document.getElementById('accountDrawerToggle').setAttribute('aria-expanded', 'true');
+}
+
+function closeAccountDrawer({ restoreFocus = true } = {}){
+  const rail = document.querySelector('.rail');
+  const toggle = document.getElementById('accountDrawerToggle');
+  const wasOpen = rail.classList.contains('is-open');
+  rail.classList.remove('is-open');
+  document.getElementById('accountDrawerBackdrop').hidden = true;
+  toggle.setAttribute('aria-expanded', 'false');
+  if(wasOpen && restoreFocus) toggle.focus();
+}
+
+function wireAccountDrawer(){
+  const toggle = document.getElementById('accountDrawerToggle');
+  const backdrop = document.getElementById('accountDrawerBackdrop');
+  toggle.addEventListener('click', () => {
+    document.querySelector('.rail').classList.contains('is-open') ? closeAccountDrawer() : openAccountDrawer();
+  });
+  backdrop.addEventListener('click', () => closeAccountDrawer());
+  document.addEventListener('keydown', event => {
+    if(event.key === 'Escape' && document.querySelector('.rail').classList.contains('is-open')) closeAccountDrawer();
+  });
+  window.matchMedia('(max-width: 760px)').addEventListener('change', event => {
+    if(!event.matches) closeAccountDrawer({ restoreFocus:false });
+  });
+}
+
+function setSelectedAccountLabel(label){
+  document.getElementById('selectedAccountLabel').textContent = label;
+}
+
 /* IG_ACCENT, fmtInt, escapeHtml, isIG, isTraffic, accentOf, accentVarsStyle,
    sparklinePath, MAIL_ICON_PATH, and railItemHtml now live in rail.js (loaded
    before this file in index.html) so the dashboard and the desktop widget
@@ -527,6 +565,7 @@ function renderChannel(idx){
   const traffic = isTraffic(ch);
   const simple = ig || traffic;
   applyAccent(accentOf(ch));
+  setSelectedAccountLabel(ch.name);
 
   document.querySelector('.eyebrow').textContent = ch.name;
   document.querySelector('.date-range').textContent = ch.dateRangeIso || 'No data yet';
@@ -568,6 +607,7 @@ function renderChannel(idx){
 function renderViewAll(){
   activeIdx = 'all';
   showAll();
+  setSelectedAccountLabel('All accounts');
   document.querySelector('.source').textContent = 'goatcounter + youtube_analytics + instagram_analytics · all accounts';
 
   const wrap = document.getElementById('viewAllWrap');
@@ -624,6 +664,7 @@ function buildRail(){
   el.querySelectorAll('.channel-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       btn.dataset.idx === 'all' ? renderViewAll() : renderChannel(+btn.dataset.idx);
+      if(isAccountDrawerMode()) closeAccountDrawer();
     });
   });
 }
@@ -1271,6 +1312,7 @@ async function init(){
   document.getElementById('generatedAt').textContent = payload.generatedAt || '—';
   updateFavicon(anyNewComments());
   buildRail();
+  wireAccountDrawer();
   wireTabs();
   // Steadfast Counter sits first in the rail, but Furad Ride stays the
   // default landing view — fall back to index 0 if it's ever missing.

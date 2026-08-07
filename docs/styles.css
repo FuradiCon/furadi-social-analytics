@@ -220,6 +220,9 @@ img{ max-width: 100%; display: block; }
 }
 .rail-foot .mono{ text-transform: none; letter-spacing: 0; color: var(--ink); font-size: 12px; }
 
+.account-drawer-toggle,
+.account-drawer-backdrop{ display: none; }
+
 /* ============================ page head ================================= */
 .page-head{
   display: flex; align-items: flex-end; justify-content: space-between;
@@ -703,6 +706,59 @@ body.bg-matrix-active{ background: #000; }
   .comment-list{ grid-template-columns: 1fr; }
   .tabs{ overflow-x: auto; flex-wrap: nowrap; }
   .tab-btn{ white-space: nowrap; }
+}
+
+@media (max-width: 760px){
+  body{ overflow-x: hidden; }
+  .app{
+    display: block;
+    max-width: none;
+    padding: var(--s4) var(--s4) var(--s6);
+  }
+  .rail{
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(286px, 82vw);
+    transform: translateX(-105%);
+    transition: transform 180ms ease;
+    z-index: 20;
+  }
+  .rail.is-open{ transform: translateX(0); }
+  .rail-inner{
+    position: relative;
+    top: 0;
+    height: 100%;
+    overflow-y: auto;
+    border-radius: 0;
+    padding: var(--s5) var(--s4) var(--s4);
+  }
+  .account-drawer-toggle{
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    margin: 0 0 var(--s5);
+    padding: var(--s2) var(--s3);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .account-drawer-toggle::before{ content: 'Accounts:'; color: var(--text-secondary); margin-right: var(--s2); }
+  .account-drawer-toggle span{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .account-drawer-backdrop{
+    position: fixed;
+    inset: 0;
+    display: block;
+    background: rgb(0 0 0 / 0.55);
+    z-index: 19;
+  }
+  .stage{ min-width: 0; width: 100%; }
+  .comment-list,
+  .video-grid,
+  .kpi-grid{ grid-template-columns: 1fr; }
+  .table-scroll{ overflow-x: auto; max-width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce){
