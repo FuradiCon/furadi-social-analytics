@@ -748,6 +748,124 @@ function renderChannel(idx){
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
+/* ---------- All-accounts attention summary ---------- */
+function sumAccountRows(account, key){
+  return (account.data || []).reduce((total, row) => total + (Number(row[key]) || 0), 0);
+}
+
+function attentionMetric(label, value){
+  return { label, value: value == null ? '—' : String(value) };
+}
+
+function isInstagramSummary(account){
+  return String(account.platform || '').toLowerCase() === 'instagram';
+}
+
+function percentChange(current, previous){
+  if(!Number.isFinite(current) || !Number.isFinite(previous) || previous === 0) return null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
+function attentionTrend(label, current, previous){
+  const value = percentChange(current, previous);
+  if(value == null) return { value:null, label:'No comparison available' };
+  const rounded = Math.round(value);
+  if(rounded === 0) return { value:0, label:label + ' flat' };
+  return {
+    value,
+    label:label + (rounded > 0 ? ' up ' : ' down ') + Math.abs(rounded) + '%'
+  };
+}
+
+function attentionMetadataReasons(account){
+  const metadata = account.attention || {};
+  const values = [
+    account.attentionReasons,
+    metadata.reasons,
+    metadata.reason,
+    typeof metadata === 'string' ? metadata : null,
+  ];
+  return values.flatMap(value => Array.isArray(value) ? value : [value])
+    .filter(value => typeof value === 'string' && value.trim())
+    .map(value => value.trim());
+}
+
+function buildAttentionRows(accounts){
+  return accounts.map((account, index) => {
+    const rows = account.data || [];
+    const instagram = isInstagramSummary(account);
+    const youtube = !instagram && !isTraffic(account);
+    const currentViews = rows.length ? sumAccountRows(account, 'views') : null;
+    const currentMinutes = youtube && rows.length ? sumAccountRows(account, 'min') : null;
+    const currentEngagement = youtube && rows.length
+      ? sumAccountRows(account, 'likes') + sumAccountRows(account, 'comments') + sumAccountRows(account, 'shares')
+      : instagram && account.totals
+        ? (Number(account.totals.likes) || 0) + (Number(account.totals.comments) || 0)
+        : null;
+    const currentAudienceChange = youtube && rows.length
+      ? sumAccountRows(account, 'subG') - sumAccountRows(account, 'subL')
+      : null;
+    const previousActivity = instagram
+      ? account.priorTotals && ((Number(account.priorTotals.likes) || 0) + (Number(account.priorTotals.comments) || 0))
+      : account.prior && account.prior.views;
+    const trendLabel = instagram ? 'Engagement' : isTraffic(account) ? 'Page views' : 'Views';
+    const trend = attentionTrend(trendLabel, instagram ? currentEngagement : currentViews, previousActivity);
+    const reasons = attentionMetadataReasons(account);
+    if(account.hasNewComments && !reasons.includes('Needs reply: new comments')) reasons.push('Needs reply: new comments');
+    if(trend.value < 0 && !reasons.includes(trend.label)) reasons.push(trend.label);
+    if(!reasons.length) reasons.push('No immediate issue');
+
+    return {
+      index,
+      name: account.name || 'Unnamed account',
+      platform: platformLabel(account),
+      hasNewComments: !!account.hasNewComments,
+      activity: attentionMetric(
+        instagram ? 'Posts' : isTraffic(account) ? 'Page views' : 'Views',
+        instagram ? account.totals && account.totals.posts : currentViews == null ? null : fmtInt(currentViews)
+      ),
+      watchTime: attentionMetric(
+        'Watch time',
+        currentMinutes == null ? null : Math.floor(currentMinutes / 60) + 'h ' + Math.round(currentMinutes % 60) + 'm'
+      ),
+      engagement: attentionMetric('Engagement', currentEngagement == null ? null : fmtInt(currentEngagement)),
+      audienceChange: attentionMetric(
+        'Subscriber change',
+        currentAudienceChange == null ? null : (currentAudienceChange >= 0 ? '+' : '') + fmtInt(currentAudienceChange)
+      ),
+      trend,
+      reasons,
+    };
+  }).sort((left, right) => {
+    const priority = row => row.hasNewComments ? 0 : row.trend.value < 0 ? 1 : row.trend.value > 0 ? 2 : 3;
+    const priorityDifference = priority(left) - priority(right);
+    if(priorityDifference) return priorityDifference;
+    if(left.trend.value !== null && right.trend.value !== null) return right.trend.value - left.trend.value;
+    return left.index - right.index;
+  });
+}
+
+function attentionMetricHtml(metric){
+  return `<span class="attention-metric"><span class="attention-metric-value">${escapeHtml(metric.value)}</span><span class="attention-metric-label">${escapeHtml(metric.label)}</span></span>`;
+}
+
+function attentionSummaryHtml(rows){
+  return `<table class="attention-summary-table">
+    <thead><tr><th scope="col">Account</th><th scope="col">Attention</th><th scope="col">Views / activity</th><th scope="col">Watch time</th><th scope="col">Engagement</th><th scope="col">Audience change</th></tr></thead>
+    <tbody>${rows.map(row => {
+      const trend = row.trend.value === null || row.reasons.includes(row.trend.label) ? '' : `<span class="attention-trend">${escapeHtml(row.trend.label)}</span>`;
+      return `<tr>
+        <th scope="row"><button class="attention-account-button" type="button" data-account-index="${row.index}" aria-label="Open ${escapeHtml(row.name)} account"><span>${escapeHtml(row.name)}</span><span class="account-platform-label">${row.platform}</span></button></th>
+        <td><span class="attention-reasons">${row.reasons.map(escapeHtml).join(' · ')}</span>${trend}</td>
+        <td>${attentionMetricHtml(row.activity)}</td>
+        <td>${attentionMetricHtml(row.watchTime)}</td>
+        <td>${attentionMetricHtml(row.engagement)}</td>
+        <td>${attentionMetricHtml(row.audienceChange)}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
 /* ---------- All accounts at once ---------- */
 function renderViewAll(){
   activeIdx = 'all';
@@ -756,7 +874,19 @@ function renderViewAll(){
   document.querySelector('.source').textContent = 'goatcounter + youtube_analytics + instagram_analytics · all accounts';
 
   const wrap = document.getElementById('viewAllWrap');
-  wrap.innerHTML = CHANNELS.map((ch,i) => {
+  const attentionRows = buildAttentionRows(CHANNELS);
+  wrap.innerHTML = `
+    <section class="attention-summary" aria-labelledby="attentionSummaryHeading">
+      <div class="attention-summary-head">
+        <div>
+          <p class="section-label">All accounts</p>
+          <h1 id="attentionSummaryHeading">Where to look first</h1>
+        </div>
+        <p class="hint">Current reporting window · select an account for detail</p>
+      </div>
+      <div class="attention-summary-scroll">${attentionSummaryHtml(attentionRows)}</div>
+    </section>
+  ` + CHANNELS.map((ch,i) => {
     const ig = isIG(ch);
     const a = accentOf(ch);
     const kpi = kpiItemsHtml(ch, true);
@@ -781,6 +911,11 @@ function renderViewAll(){
         ${videos ? `<p class="section-label">${videos.label}</p><div class="video-grid">${videos.html}</div>` : ''}
       </section>`;
   }).join('');
+
+  wrap.querySelector('.attention-summary').addEventListener('click', event => {
+    const button = event.target.closest('.attention-account-button');
+    if(button) renderChannel(Number(button.dataset.accountIndex));
+  });
 
   scheduleCommentDisclosures(wrap);
 
