@@ -188,6 +188,8 @@ def fetch_channel_bundle(cfg, start, end, prior_start, prior_end):
         "name": name,
         "url": f"https://www.youtube.com/channel/{channel_id}",
         "accent": cfg["accent"],
+        "platform": cfg["platform"],
+        "accountType": cfg["accountType"],
         "dateRangeIso": f"{start} → {end}",
         "data": rows,
         "topVideos": top_videos,

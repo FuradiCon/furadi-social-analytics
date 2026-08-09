@@ -47,17 +47,24 @@
   </aside>
 
   <main class="stage" id="stage">
+    <button id="accountDrawerToggle" class="account-drawer-toggle" type="button" aria-controls="channelTabs" aria-expanded="false">
+      <span id="selectedAccountLabel">Accounts</span>
+    </button>
+    <div id="accountDrawerBackdrop" class="account-drawer-backdrop" hidden></div>
 
     <div id="singleChannelWrap">
       <header class="page-head">
         <div class="page-head-main">
           <p class="eyebrow"></p>
+          <p id="activeAccountPlatformLabel" class="account-platform-label active-account-platform-label"></p>
           <h1>Daily performance<span class="comment-alert" id="commentAlert" title="Comments" role="img" aria-label="Comments">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>
           </span></h1>
         </div>
         <div class="page-head-controls">
           <div class="date-range"></div>
+          <span id="freshnessStatus" class="freshness-status" role="status" aria-describedby="freshnessExact"></span>
+          <span id="freshnessExact" class="sr-only"></span>
           <div class="bg-switch" role="group" aria-label="Background style">
             <button class="bg-switch-btn" type="button" data-bg="particles" aria-pressed="false">Particles</button>
             <button class="bg-switch-btn" type="button" data-bg="matrix" aria-pressed="false">Matrix</button>
@@ -87,7 +94,7 @@
 
       <section class="block" id="commentsSection" hidden>
         <p class="section-label">Recent comments <span class="hint">latest 4</span></p>
-        <div class="comment-list" id="commentList"></div>
+        <div class="comment-list" id="commentList" aria-live="polite"></div>
       </section>
 
       <section class="block" id="topVideosSection" hidden>

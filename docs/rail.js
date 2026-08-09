@@ -16,6 +16,13 @@ function isIG(ch){ return ch.platform === 'instagram'; }
 function isTraffic(ch){ return ch.kind === 'traffic'; }
 function accentOf(ch){ return ch.accent || IG_ACCENT; }
 
+function platformLabel(ch){
+  const parts = [ch && ch.platform, ch && ch.accountType]
+    .map(value => String(value || '').trim())
+    .filter(Boolean);
+  return escapeHtml(parts.length ? parts.join(' · ').toUpperCase() : 'ACCOUNT');
+}
+
 function accentVarsStyle(a){
   return `--accent:${a.accent};--accent-strong:${a.accentStrong};--accent-soft:${a.accentSoft};`;
 }
@@ -78,6 +85,7 @@ function railItemHtml(ch, idx){
         <span class="rail-name">${escapeHtml(ch.name)}</span>
         ${alertHtml}
       </span>
+      <span class="account-platform-label">${platformLabel(ch)}</span>
       <span class="rail-metric">${metric}</span>
       ${spark}
     </button>`;

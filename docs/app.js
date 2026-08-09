@@ -4,11 +4,50 @@
 
 let CHANNELS = [];
 let activeIdx = 'all';
+let dashboardPayload = null;
 
-/* IG_ACCENT, fmtInt, escapeHtml, isIG, isTraffic, accentOf, accentVarsStyle,
-   sparklinePath, MAIL_ICON_PATH, and railItemHtml now live in rail.js (loaded
-   before this file in index.html) so the dashboard and the desktop widget
-   share one copy of the rail's rendering logic. */
+function isAccountDrawerMode(){ return window.matchMedia('(max-width: 760px)').matches; }
+
+function openAccountDrawer(){
+  if(!isAccountDrawerMode()) return;
+  document.querySelector('.rail').classList.add('is-open');
+  document.getElementById('accountDrawerBackdrop').hidden = false;
+  document.getElementById('accountDrawerToggle').setAttribute('aria-expanded', 'true');
+}
+
+function closeAccountDrawer({ restoreFocus = true } = {}){
+  const rail = document.querySelector('.rail');
+  const toggle = document.getElementById('accountDrawerToggle');
+  const wasOpen = rail.classList.contains('is-open');
+  rail.classList.remove('is-open');
+  document.getElementById('accountDrawerBackdrop').hidden = true;
+  toggle.setAttribute('aria-expanded', 'false');
+  if(wasOpen && restoreFocus) toggle.focus();
+}
+
+function wireAccountDrawer(){
+  const toggle = document.getElementById('accountDrawerToggle');
+  const backdrop = document.getElementById('accountDrawerBackdrop');
+  toggle.addEventListener('click', () => {
+    document.querySelector('.rail').classList.contains('is-open') ? closeAccountDrawer() : openAccountDrawer();
+  });
+  backdrop.addEventListener('click', () => closeAccountDrawer());
+  document.addEventListener('keydown', event => {
+    if(event.key === 'Escape' && document.querySelector('.rail').classList.contains('is-open')) closeAccountDrawer();
+  });
+  window.matchMedia('(max-width: 760px)').addEventListener('change', event => {
+    if(!event.matches) closeAccountDrawer({ restoreFocus:false });
+  });
+}
+
+function setSelectedAccountLabel(label){
+  document.getElementById('selectedAccountLabel').textContent = label;
+}
+
+/* IG_ACCENT, fmtInt, escapeHtml, isIG, isTraffic, accentOf, platformLabel,
+   accentVarsStyle, sparklinePath, MAIL_ICON_PATH, and railItemHtml now live in
+   rail.js (loaded before this file in index.html) so the dashboard and the
+   desktop widget share one copy of the rail's rendering logic. */
 
 /* ---------- formatting ---------- */
 function fmtDay(d){ const dt = new Date(d + 'T00:00:00'); return dt.toLocaleDateString('en-US', { month:'short', day:'numeric' }); }
@@ -29,6 +68,57 @@ function timeAgo(iso){
   return fmtDay(iso.slice(0,10));
 }
 function plural(n, word){ return fmtInt(n) + ' ' + word + (Math.abs(n) === 1 ? '' : 's'); }
+
+function parseBuildTimestamp(value){
+  if(typeof value !== 'string' || !value.trim()) return null;
+  const normalized = value.trim().replace(/^([0-9]{4}-[0-9]{2}-[0-9]{2})\s+/, '$1T').replace(/\s+UTC$/, 'Z');
+  const timestamp = new Date(normalized);
+  return Number.isNaN(timestamp.getTime()) ? null : timestamp;
+}
+
+function formatRelativeUpdate(lastBuiltAt, now = new Date()){
+  const timestamp = parseBuildTimestamp(lastBuiltAt);
+  const current = now instanceof Date ? now : parseBuildTimestamp(now);
+  if(!timestamp || !current) return { label:'Update time unavailable', stale:false, exact:'' };
+  const elapsedSeconds = Math.max(0, Math.floor((current.getTime() - timestamp.getTime()) / 1000));
+  const stale = elapsedSeconds >= 2 * 60 * 60;
+  let relative;
+  if(elapsedSeconds < 60) relative = 'just now';
+  else if(elapsedSeconds < 60 * 60) relative = Math.floor(elapsedSeconds / 60) + ' minute' + (Math.floor(elapsedSeconds / 60) === 1 ? '' : 's') + ' ago';
+  else if(elapsedSeconds < 24 * 60 * 60) relative = Math.floor(elapsedSeconds / (60 * 60)) + ' hour' + (Math.floor(elapsedSeconds / (60 * 60)) === 1 ? '' : 's') + ' ago';
+  else relative = Math.floor(elapsedSeconds / (24 * 60 * 60)) + ' day' + (Math.floor(elapsedSeconds / (24 * 60 * 60)) === 1 ? '' : 's') + ' ago';
+  return { label:'Updated ' + relative, stale, exact:timestamp.toISOString() };
+}
+
+function reportingWindowContext(ch){
+  const rows = Array.isArray(ch && ch.data) ? ch.data : [];
+  const datedRows = rows.filter(row => /^\d{4}-\d{2}-\d{2}$/.test(row && row.d));
+  const latestDay = datedRows.length
+    ? datedRows.reduce((latest, row) => row.d > latest ? row.d : latest, datedRows[0].d)
+    : null;
+  const metadataDay = /^\d{4}-\d{2}-\d{2}$/.test(ch && ch.dataThrough) ? ch.dataThrough : null;
+  const dataThrough = metadataDay && (!latestDay || metadataDay <= latestDay) ? metadataDay : latestDay;
+  const metadataDays = Number.isInteger(ch && ch.windowDays) && ch.windowDays >= 0 ? ch.windowDays : null;
+  const windowDays = metadataDays === null ? datedRows.length : metadataDays;
+  return [
+    dataThrough ? 'Data through ' + fmtDay(dataThrough) : 'Data through unavailable',
+    windowDays + ' complete day' + (windowDays === 1 ? '' : 's')
+  ];
+}
+
+function renderFreshnessStatus(data, now = new Date()){
+  const el = document.getElementById('freshnessStatus');
+  if(!el) return;
+  const timestamp = data && (parseBuildTimestamp(data.lastBuiltAt) ? data.lastBuiltAt : data.generatedAt);
+  const freshness = formatRelativeUpdate(timestamp, now);
+  const ch = typeof activeIdx === 'number' ? data && data.channels && data.channels[activeIdx] : null;
+  const parts = [freshness.stale ? 'Stale' : '', freshness.label, ...reportingWindowContext(ch)].filter(Boolean);
+  el.textContent = parts.join(' · ');
+  el.title = freshness.exact ? 'Last built ' + freshness.exact : '';
+  document.getElementById('freshnessExact').textContent = freshness.exact ? 'Exact build timestamp: ' + freshness.exact : '';
+  el.classList.toggle('is-warning', freshness.label === 'Update time unavailable');
+  el.classList.toggle('is-stale', freshness.stale);
+}
 
 /* Rounds an axis maximum up so that `ticks` evenly spaced gridlines all land on
    whole numbers — every metric here is a count, so "0 · 2 · 3 · 5" style axes
@@ -202,26 +292,116 @@ function renderTopVideos(ch){
 }
 
 /* ---------- Recent comments ---------- */
+let commentRenderSequence = 0;
+let commentDisclosureRaf = null;
+
+function commentTextId(ch, renderContext, index){
+  return `comment-${renderContext}-${String(ch.slug || 'channel').replace(/[^a-z0-9_-]/gi, '-')}-${index}-text`;
+}
+
 function commentsHtml(ch){
   if(!ch.comments || !ch.comments.length) return null;
-  return ch.comments.map(c => `
-    <article class="comment-item${c.awaitingReply ? ' awaiting' : ''}">
+  const renderContext = ++commentRenderSequence;
+  const comments = [...ch.comments].sort((a, b) => {
+    const awaitingOrder = Number(Boolean(b.awaitingReply)) - Number(Boolean(a.awaitingReply));
+    if(awaitingOrder) return awaitingOrder;
+    return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+  });
+  return comments.map((c, index) => {
+    const textId = commentTextId(ch, renderContext, index);
+    const author = escapeHtml(c.author);
+    const reviewDestination = c.commentUrl || c.videoUrl;
+    return `
+    <article class="comment-item${c.awaitingReply ? ' awaiting' : ''}" tabindex="-1">
       ${c.avatar
         ? `<img class="comment-avatar" src="${escapeHtml(c.avatar)}" alt="" loading="lazy" />`
         : `<div class="comment-avatar comment-avatar-fallback">${escapeHtml((c.author || '?').charAt(0).toUpperCase())}</div>`}
       <div class="comment-body">
         <div class="comment-meta">
-          <span class="comment-author">${escapeHtml(c.author)}</span>
+          <span class="comment-author">${author}</span>
           <span class="comment-time">${timeAgo(c.publishedAt)}</span>
-          ${c.awaitingReply ? '<span class="comment-flag">Needs a reply</span>' : ''}
+          ${c.awaitingReply ? '<span class="comment-flag">Needs reply</span>' : ''}
         </div>
-        <p class="comment-text">${escapeHtml(c.text)}</p>
+        <p class="comment-text" id="${textId}">${escapeHtml(c.text)}</p>
         <div class="comment-footer">
           <span>${fmtInt(c.likes)} likes</span>
           ${c.videoUrl ? `<a href="${escapeHtml(c.videoUrl)}" target="_blank" rel="noopener noreferrer">Open video</a>` : ''}
+          <button class="comment-action comment-expand" type="button" hidden aria-expanded="false" aria-controls="${textId}" aria-label="Show full comment from ${author}">Show more</button>
+          ${c.awaitingReply ? (reviewDestination
+            ? `<a class="comment-action comment-review" href="${escapeHtml(reviewDestination)}" target="_blank" rel="noopener noreferrer" aria-label="Review comment from ${author}">Review comment</a>`
+            : `<button class="comment-action comment-review-local" type="button" aria-label="Review comment from ${author}">Review comment</button><span class="comment-review-status" aria-live="polite"></span>`) : ''}
         </div>
       </div>
-    </article>`).join('');
+    </article>`;
+  }).join('');
+}
+
+function updateCommentDisclosures(scope){
+  scope.querySelectorAll('.comment-text').forEach(text => {
+    const button = text.parentElement.querySelector('.comment-expand');
+    if(!button) return;
+
+    const expanded = button.getAttribute('aria-expanded') === 'true';
+    text.classList.remove('is-clamped');
+    button.hidden = true;
+    const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
+    const hasOverflow = Number.isFinite(lineHeight) && text.scrollHeight > lineHeight * 3 + 1;
+    if(!hasOverflow){
+      button.setAttribute('aria-expanded', 'false');
+      button.textContent = 'Show more';
+      button.setAttribute('aria-label', `Show full comment from ${text.closest('.comment-item').querySelector('.comment-author').textContent}`);
+      return;
+    }
+
+    button.hidden = false;
+    if(!expanded) text.classList.add('is-clamped');
+  });
+}
+
+function scheduleCommentDisclosures(scope){
+  if(commentDisclosureRaf) cancelAnimationFrame(commentDisclosureRaf);
+  commentDisclosureRaf = requestAnimationFrame(() => {
+    commentDisclosureRaf = null;
+    if(scope.offsetParent !== null) updateCommentDisclosures(scope);
+  });
+}
+
+function wireCommentDisclosureMeasurements(){
+  window.addEventListener('resize', () => {
+    if(commentDisclosureRaf) cancelAnimationFrame(commentDisclosureRaf);
+    commentDisclosureRaf = requestAnimationFrame(() => {
+      commentDisclosureRaf = null;
+      document.querySelectorAll('.comment-list').forEach(scope => {
+        if(scope.offsetParent !== null) updateCommentDisclosures(scope);
+      });
+    });
+  });
+}
+
+function wireCommentActions(){
+  document.addEventListener('click', event => {
+    const expandButton = event.target.closest('.comment-expand');
+    if(expandButton){
+      const card = expandButton.closest('.comment-item');
+      const text = card.querySelector('.comment-text');
+      const expanded = expandButton.getAttribute('aria-expanded') === 'true';
+      text.classList.toggle('is-clamped', expanded);
+      expandButton.setAttribute('aria-expanded', String(!expanded));
+      expandButton.textContent = expanded ? 'Show more' : 'Show less';
+      expandButton.setAttribute('aria-label', `${expanded ? 'Show full' : 'Collapse'} comment from ${card.querySelector('.comment-author').textContent}`);
+      return;
+    }
+
+    const reviewButton = event.target.closest('.comment-review-local');
+    if(reviewButton){
+      const card = reviewButton.closest('.comment-item');
+      card.classList.add('is-under-review');
+      reviewButton.disabled = true;
+      reviewButton.textContent = 'In review';
+      card.querySelector('.comment-review-status').textContent = 'Marked for review.';
+      card.focus({ preventScroll:false });
+    }
+  });
 }
 
 function renderComments(ch){
@@ -231,6 +411,7 @@ function renderComments(ch){
   if(!html){ section.hidden = true; list.innerHTML = ''; return; }
   list.innerHTML = html;
   section.hidden = false;
+  scheduleCommentDisclosures(list);
 }
 
 /* ---------- Simple-channel primary chart (traffic channels' daily page views) ---------- */
@@ -527,9 +708,12 @@ function renderChannel(idx){
   const traffic = isTraffic(ch);
   const simple = ig || traffic;
   applyAccent(accentOf(ch));
+  setSelectedAccountLabel(ch.name);
 
   document.querySelector('.eyebrow').textContent = ch.name;
+  document.querySelector('.active-account-platform-label').innerHTML = platformLabel(ch);
   document.querySelector('.date-range').textContent = ch.dateRangeIso || 'No data yet';
+  renderFreshnessStatus(dashboardPayload);
   // Instagram ships period totals and traffic ships page views, neither is a
   // per-video daily series — don't promise a "Daily performance" view for them.
   document.querySelector('.page-head h1').firstChild.nodeValue = ig ? 'Account performance' : traffic ? 'Page performance' : 'Daily performance';
@@ -564,14 +748,196 @@ function renderChannel(idx){
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
+/* ---------- All-accounts attention summary ---------- */
+function sumAccountRows(account, key){
+  const rows = Array.isArray(account.data) ? account.data : [];
+  if(!rows.length) return null;
+  let total = 0;
+  for(const row of rows){
+    const value = row && row[key];
+    if(typeof value !== 'number' || !Number.isFinite(value)) return null;
+    total += value;
+  }
+  return total;
+}
+
+function numericField(record, key){
+  const value = record && record[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function sumNumericFields(record, keys){
+  const values = keys.map(key => numericField(record, key));
+  return values.every(value => value !== null) ? values.reduce((total, value) => total + value, 0) : null;
+}
+
+function sumAccountFields(account, keys){
+  const values = keys.map(key => sumAccountRows(account, key));
+  return values.every(value => value !== null) ? values.reduce((total, value) => total + value, 0) : null;
+}
+
+function attentionMetric(label, value){
+  return { label, value: value == null ? '—' : String(value) };
+}
+
+function isInstagramSummary(account){
+  return String(account.platform || '').toLowerCase() === 'instagram';
+}
+
+function percentChange(current, previous){
+  if(!Number.isFinite(current) || !Number.isFinite(previous) || previous === 0) return null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
+function attentionTrend(label, current, previous){
+  const value = percentChange(current, previous);
+  if(value == null) return { value:null, label:'No comparison available' };
+  const rounded = Math.round(value);
+  if(rounded === 0) return { value:0, label:label + ' flat' };
+  return {
+    value,
+    label:label + (rounded > 0 ? ' up ' : ' down ') + Math.abs(rounded) + '%'
+  };
+}
+
+function attentionMetadataReasons(account){
+  const metadata = account.attention || {};
+  const values = [
+    account.attentionReasons,
+    metadata.reasons,
+    metadata.reason,
+    typeof metadata === 'string' ? metadata : null,
+  ];
+  return values.flatMap(value => Array.isArray(value) ? value : [value])
+    .filter(value => typeof value === 'string' && value.trim())
+    .map(value => value.trim());
+}
+
+function attentionReasonPriority(reasons){
+  if(!reasons.length) return null;
+  const text = reasons.join(' ').toLowerCase();
+  if(/needs?\s+reply|reply\b|new comments?/.test(text)) return 0;
+  if(/down|declin|drop|decreas|loss|lost|negative/.test(text)) return 1;
+  if(/up|best|growth|increas|positive|no immediate issue|no issue|flat/.test(text)) return 3;
+  return 2;
+}
+
+function fallbackAttentionPriority(trend){
+  if(trend.value < 0) return 1;
+  if(trend.value > 0) return 2;
+  return 3;
+}
+
+function buildAttentionRows(accounts){
+  return accounts.map((account, index) => {
+    const instagram = isInstagramSummary(account);
+    const youtube = !instagram && !isTraffic(account);
+    const currentViews = sumAccountRows(account, 'views');
+    const currentMinutes = youtube ? sumAccountRows(account, 'min') : null;
+    const currentEngagement = youtube
+      ? sumAccountFields(account, ['likes', 'comments', 'shares'])
+      : instagram && account.totals
+        ? sumNumericFields(account.totals, ['likes', 'comments'])
+        : null;
+    const subscriberGained = youtube ? sumAccountRows(account, 'subG') : null;
+    const subscriberLost = youtube ? sumAccountRows(account, 'subL') : null;
+    const currentAudienceChange = subscriberGained === null || subscriberLost === null
+      ? null
+      : subscriberGained - subscriberLost;
+    const previousActivity = instagram
+      ? sumNumericFields(account.priorTotals, ['likes', 'comments'])
+      : numericField(account.prior, 'views');
+    const trendLabel = instagram ? 'Engagement' : isTraffic(account) ? 'Page views' : 'Views';
+    const trend = attentionTrend(trendLabel, instagram ? currentEngagement : currentViews, previousActivity);
+    const generatedReasons = attentionMetadataReasons(account);
+    const reasons = [...generatedReasons];
+    if(account.hasNewComments && !reasons.includes('Needs reply: new comments')) reasons.push('Needs reply: new comments');
+    if(trend.value < 0 && !reasons.includes(trend.label)) reasons.push(trend.label);
+    if(!reasons.length) reasons.push('No immediate issue');
+    const generatedPriority = attentionReasonPriority([
+      ...generatedReasons,
+      ...(account.hasNewComments ? ['Needs reply: new comments'] : []),
+    ]);
+    const attentionPriority = generatedPriority === null ? fallbackAttentionPriority(trend) : generatedPriority;
+
+    return {
+      index,
+      name: account.name || 'Unnamed account',
+      platform: platformLabel(account),
+      hasNewComments: !!account.hasNewComments,
+      attentionPriority,
+      attentionPrioritySource: generatedPriority === null ? 'fallback' : 'generated',
+      activity: attentionMetric(
+        instagram ? 'Posts' : isTraffic(account) ? 'Page views' : 'Views',
+        instagram ? numericField(account.totals, 'posts') : currentViews == null ? null : fmtInt(currentViews)
+      ),
+      watchTime: attentionMetric(
+        'Watch time',
+        currentMinutes == null ? null : Math.floor(currentMinutes / 60) + 'h ' + Math.round(currentMinutes % 60) + 'm'
+      ),
+      engagement: attentionMetric('Engagement', currentEngagement == null ? null : fmtInt(currentEngagement)),
+      audienceChange: attentionMetric(
+        'Subscriber change',
+        currentAudienceChange == null ? null : (currentAudienceChange >= 0 ? '+' : '') + fmtInt(currentAudienceChange)
+      ),
+      trend,
+      reasons,
+    };
+  }).sort((left, right) => {
+    const priorityDifference = left.attentionPriority - right.attentionPriority;
+    if(priorityDifference) return priorityDifference;
+    if(left.attentionPrioritySource !== right.attentionPrioritySource){
+      return left.attentionPrioritySource === 'generated' ? -1 : 1;
+    }
+    if(left.attentionPrioritySource === 'fallback' && left.attentionPriority === 2){
+      return right.trend.value - left.trend.value;
+    }
+    return left.index - right.index;
+  });
+}
+
+function attentionMetricHtml(metric){
+  return `<span class="attention-metric"><span class="attention-metric-value">${escapeHtml(metric.value)}</span><span class="attention-metric-label">${escapeHtml(metric.label)}</span></span>`;
+}
+
+function attentionSummaryHtml(rows){
+  return `<table class="attention-summary-table">
+    <thead><tr><th scope="col">Account</th><th scope="col">Attention</th><th scope="col">Views / activity</th><th scope="col">Watch time</th><th scope="col">Engagement</th><th scope="col">Audience change</th></tr></thead>
+    <tbody>${rows.map(row => {
+      const trend = row.trend.value === null || row.reasons.includes(row.trend.label) ? '' : `<span class="attention-trend">${escapeHtml(row.trend.label)}</span>`;
+      return `<tr>
+        <th scope="row"><button class="attention-account-button" type="button" data-account-index="${row.index}" aria-label="Open ${escapeHtml(row.name)} account"><span>${escapeHtml(row.name)}</span><span class="account-platform-label">${row.platform}</span></button></th>
+        <td data-label="Attention"><span class="attention-reasons">${row.reasons.map(escapeHtml).join(' · ')}</span>${trend}</td>
+        <td data-label="Views / activity">${attentionMetricHtml(row.activity)}</td>
+        <td data-label="Watch time">${attentionMetricHtml(row.watchTime)}</td>
+        <td data-label="Engagement">${attentionMetricHtml(row.engagement)}</td>
+        <td data-label="Audience change">${attentionMetricHtml(row.audienceChange)}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
 /* ---------- All accounts at once ---------- */
 function renderViewAll(){
   activeIdx = 'all';
   showAll();
+  setSelectedAccountLabel('All accounts');
   document.querySelector('.source').textContent = 'goatcounter + youtube_analytics + instagram_analytics · all accounts';
 
   const wrap = document.getElementById('viewAllWrap');
-  wrap.innerHTML = CHANNELS.map((ch,i) => {
+  const attentionRows = buildAttentionRows(CHANNELS);
+  wrap.innerHTML = `
+    <section class="attention-summary" aria-labelledby="attentionSummaryHeading">
+      <div class="attention-summary-head">
+        <div>
+          <p class="section-label">All accounts</p>
+          <h1 id="attentionSummaryHeading">Where to look first</h1>
+        </div>
+        <p class="hint">Current reporting window · select an account for detail</p>
+      </div>
+      <div class="attention-summary-scroll">${attentionSummaryHtml(attentionRows)}</div>
+    </section>
+  ` + CHANNELS.map((ch,i) => {
     const ig = isIG(ch);
     const a = accentOf(ch);
     const kpi = kpiItemsHtml(ch, true);
@@ -583,7 +949,10 @@ function renderViewAll(){
         <div class="viewall-head">
           <div class="viewall-title">
             <span class="channel-dot" aria-hidden="true"></span>
-            <h2>${escapeHtml(ch.name)}</h2>
+            <div class="viewall-title-copy">
+              <h2>${escapeHtml(ch.name)}</h2>
+              <span class="account-platform-label">${platformLabel(ch)}</span>
+            </div>
           </div>
           <span class="date-range">${escapeHtml(ch.dateRangeIso || 'No data yet')}</span>
         </div>
@@ -593,6 +962,13 @@ function renderViewAll(){
         ${videos ? `<p class="section-label">${videos.label}</p><div class="video-grid">${videos.html}</div>` : ''}
       </section>`;
   }).join('');
+
+  wrap.querySelector('.attention-summary').addEventListener('click', event => {
+    const button = event.target.closest('.attention-account-button');
+    if(button) renderChannel(Number(button.dataset.accountIndex));
+  });
+
+  scheduleCommentDisclosures(wrap);
 
   animateKpiValues(wrap);
   CHANNELS.forEach((ch,i) => {
@@ -624,6 +1000,7 @@ function buildRail(){
   el.querySelectorAll('.channel-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       btn.dataset.idx === 'all' ? renderViewAll() : renderChannel(+btn.dataset.idx);
+      if(isAccountDrawerMode()) closeAccountDrawer();
     });
   });
 }
@@ -1265,17 +1642,21 @@ async function init(){
   }
 
   CHANNELS = payload.channels || [];
+  dashboardPayload = payload;
   // Charts read oldest → newest, left to right; tables list newest first.
   CHANNELS.forEach(ch => { ch.tableRows = ch.data ? [...ch.data].reverse() : []; });
 
   document.getElementById('generatedAt').textContent = payload.generatedAt || '—';
   updateFavicon(anyNewComments());
   buildRail();
+  wireAccountDrawer();
   wireTabs();
+  wireCommentDisclosureMeasurements();
   // Steadfast Counter sits first in the rail, but Furad Ride stays the
   // default landing view — fall back to index 0 if it's ever missing.
   const defaultIdx = Math.max(0, CHANNELS.findIndex(ch => ch.slug === 'furad-ride'));
   renderChannel(defaultIdx);
+  wireCommentActions();
 }
 
 document.addEventListener('DOMContentLoaded', () => { initBackground(); wireBackgroundControls(); init(); });
