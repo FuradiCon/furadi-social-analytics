@@ -81,7 +81,7 @@ def test_build_continues_when_one_channel_fails(tmp_path):
     assert "furadi" in slugs
 
 
-def test_build_puts_steadfast_counter_first_when_available(tmp_path):
+def test_build_puts_steadfast_counter_last_when_available(tmp_path):
     def fake_steadfast():
         return {"slug": "steadfast-counter", "kind": "traffic", "data": [{"d": "2026-07-01", "views": 5}]}
 
@@ -95,8 +95,37 @@ def test_build_puts_steadfast_counter_first_when_available(tmp_path):
 
     assert published is True
     data = json.loads((tmp_path / "data.json").read_text())
-    assert data["channels"][0]["slug"] == "steadfast-counter"
-    assert data["channels"][1]["slug"] == "furad-ride"
+    assert data["channels"][0]["slug"] == "furad-ride"
+    assert data["channels"][-1]["slug"] == "steadfast-counter"
+
+
+def test_build_sorts_youtube_channels_by_view_count_descending(tmp_path):
+    cfgs = [
+        {"slug": "low", "channel_id": "UC-low", "token_path": "t.json", "accent": {"accent": "#FF5A00"}},
+        {"slug": "high", "channel_id": "UC-high", "token_path": "t.json", "accent": {"accent": "#FF5A00"}},
+        {"slug": "mid", "channel_id": "UC-mid", "token_path": "t.json", "accent": {"accent": "#FF5A00"}},
+    ]
+    views_by_slug = {"low": 10, "high": 1000, "mid": 100}
+
+    def fetcher(cfg, *args):
+        return {
+            "slug": cfg["slug"],
+            "name": cfg["slug"],
+            "accent": cfg["accent"],
+            "data": [{"d": "2026-07-01", "views": views_by_slug[cfg["slug"]]}],
+        }
+
+    published = build(
+        channel_cfgs=cfgs,
+        channel_fetcher=fetcher,
+        instagram_fetcher=lambda *a, **kw: {"slug": "instagram", "platform": "instagram", "topVideos": []},
+        steadfast_fetcher=_failing_steadfast,
+        out_dir=str(tmp_path),
+    )
+
+    assert published is True
+    data = json.loads((tmp_path / "data.json").read_text())
+    assert [c["slug"] for c in data["channels"]] == ["high", "mid", "low", "instagram"]
 
 
 def test_build_continues_when_steadfast_counter_fails(tmp_path):
@@ -174,6 +203,10 @@ def test_build_keeps_instagram_bundle_when_a_thumbnail_download_fails(tmp_path, 
         channel_cfgs=CHANNEL_CFGS,
         channel_fetcher=_good_bundle,
         instagram_fetcher=fake_instagram_fetcher,
+        # Steadfast Counter now renders after Instagram, so pin it to a
+        # deterministic failure here -- this test is about the thumbnail
+        # fallback, not about whichever channel happens to render last.
+        steadfast_fetcher=_failing_steadfast,
         out_dir=str(tmp_path),
     )
 

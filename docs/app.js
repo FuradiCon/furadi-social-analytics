@@ -1652,10 +1652,11 @@ async function init(){
   wireAccountDrawer();
   wireTabs();
   wireCommentDisclosureMeasurements();
-  // Steadfast Counter sits first in the rail, but Furad Ride stays the
-  // default landing view — fall back to index 0 if it's ever missing.
-  const defaultIdx = Math.max(0, CHANNELS.findIndex(ch => ch.slug === 'furad-ride'));
-  renderChannel(defaultIdx);
+  // build_data.py orders channels as [YouTube by 28d views, descending] ->
+  // Instagram -> Steadfast Counter, so index 0 is always the top-viewed
+  // YouTube channel (or whatever fetched successfully, if none did) --
+  // exactly what should land by default.
+  renderChannel(0);
   wireCommentActions();
 }
 

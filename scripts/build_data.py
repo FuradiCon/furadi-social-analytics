@@ -90,23 +90,26 @@ def build(channel_cfgs=None, channel_fetcher=fetch_channel_bundle,
     channels_data = []
     any_success = False
 
-    # Steadfast Counter is prepended first so it renders at the top of the
-    # rail, above the YouTube channels — it tracks a separate site's page
-    # traffic, not a YouTube/Instagram account, so a fetch failure here must
-    # never sink the rest of the dashboard build.
-    try:
-        channels_data.append(attach_account_metadata(steadfast_fetcher()))
-        any_success = True
-    except Exception as e:
-        print(f"[Steadfast Counter] FAILED: {e}")
-
+    # YouTube channels are collected first, then sorted by 28-day view count
+    # (descending) once every fetch has had its turn -- that's the same
+    # number the rail displays next to each channel's name, so the rail's
+    # order always matches what's on screen. A per-channel failure just means
+    # that channel isn't in the list to sort; it can't sink the others or
+    # affect their relative order.
+    youtube_bundles = []
     for cfg in channel_cfgs:
         try:
             bundle = channel_fetcher(cfg, start, end, prior_start, prior_end)
-            channels_data.append(attach_account_metadata(bundle))
+            youtube_bundles.append(attach_account_metadata(bundle))
             any_success = True
         except Exception as e:
             print(f"[{cfg['slug']}] FAILED: {e}")
+
+    youtube_bundles.sort(
+        key=lambda b: sum(row.get("views", 0) for row in b.get("data") or []),
+        reverse=True,
+    )
+    channels_data.extend(youtube_bundles)
 
     try:
         ig_bundle = instagram_fetcher(INSTAGRAM_TOKEN_FILE, INSTAGRAM_CLIENT_SECRET_FILE)
@@ -115,6 +118,16 @@ def build(channel_cfgs=None, channel_fetcher=fetch_channel_bundle,
         any_success = True
     except Exception as e:
         print(f"[Instagram] FAILED: {e}")
+
+    # Steadfast Counter renders last -- it tracks a separate site's page
+    # traffic, not a YouTube/Instagram account, so it sits outside the
+    # view-count ranking rather than being folded into it. A fetch failure
+    # here must never sink the rest of the dashboard build.
+    try:
+        channels_data.append(attach_account_metadata(steadfast_fetcher()))
+        any_success = True
+    except Exception as e:
+        print(f"[Steadfast Counter] FAILED: {e}")
 
     if not any_success:
         print("All fetches failed; leaving existing data.json untouched")
