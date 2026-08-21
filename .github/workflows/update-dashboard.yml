@@ -47,4 +47,28 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/data.json docs/assets
           git diff --cached --quiet || git commit -m "Update dashboard data $(date -u +'%Y-%m-%d %H:%M UTC')"
-          git push
+
+          if git push; then
+            exit 0
+          fi
+
+          # The concurrency group above is meant to stop two runs (GitHub's own
+          # */20 cron and the local hourly nudge -- see scripts/trigger_pipeline.vbs
+          # -- landing in the same minute) from racing, but a queued run's
+          # checkout can still start before the prior run's push is fully visible
+          # to it, so a rejected push here is a real, observed case, not a
+          # hypothetical. If origin's newest commit is another auto-generated
+          # data update, a sibling run already published equivalent-or-fresher
+          # data moments ago -- nothing left for this run to contribute, so stand
+          # down instead of failing the workflow over a non-problem. Anything
+          # else at the tip of origin/main is a genuine conflict and should still
+          # fail loudly for a human to look at.
+          git fetch origin main
+          remote_subject="$(git log -1 --format=%s origin/main)"
+          if [[ "$remote_subject" == "Update dashboard data "* ]]; then
+            echo "origin/main was already updated by a concurrent run ('$remote_subject') -- nothing to do."
+            exit 0
+          fi
+
+          echo "::error::Push rejected and origin/main's latest commit ('$remote_subject') isn't a routine data update -- needs a look."
+          exit 1
