@@ -125,6 +125,8 @@ img{ max-width: 100%; display: block; }
 .rail{ position: relative; }
 .rail-inner{
   position: sticky; top: var(--s7);
+  max-height: calc(100vh - var(--s7) - var(--s4));
+  overflow-y: auto;
   background: var(--surface-translucent);
   backdrop-filter: blur(17px) saturate(180%);
   -webkit-backdrop-filter: blur(17px) saturate(180%);
