@@ -25,7 +25,18 @@ async function loadDashboardContext(){
     setTimeout(){ return 0; },
     location: { reload(){} },
     window: { matchMedia(){ return { matches: true }; } },
-    document: { addEventListener(){} },
+    document: {
+      addEventListener(){},
+      createElement(tag){
+        return {
+          textContent: '',
+          get innerHTML(){
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
+            return this.textContent.replace(/[&<>]/g, c => map[c]);
+          }
+        };
+      }
+    },
   };
   context.globalThis = context;
   vm.createContext(context);
@@ -63,7 +74,18 @@ test("a fresh context picks up previously persisted dismissals", async () => {
     clearTimeout(){}, setTimeout(){ return 0; },
     location: { reload(){} },
     window: { matchMedia(){ return { matches: true }; } },
-    document: { addEventListener(){} },
+    document: {
+      addEventListener(){},
+      createElement(tag){
+        return {
+          textContent: '',
+          get innerHTML(){
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
+            return this.textContent.replace(/[&<>]/g, c => map[c]);
+          }
+        };
+      }
+    },
   };
   context.globalThis = context;
   vm.createContext(context);
@@ -73,4 +95,33 @@ test("a fresh context picks up previously persisted dismissals", async () => {
 
   assert.equal(context.isCommentDismissed("already-dismissed"), true);
   assert.equal(context.isCommentDismissed("never-touched"), false);
+});
+
+test("commentsHtml treats a dismissed comment as no longer awaiting", async () => {
+  const { context } = await loadDashboardContext();
+  const ch = {
+    slug: "test-channel",
+    comments: [
+      { id: "still-open", author: "A", text: "Hi", likes: 1, publishedAt: "2026-08-20T12:00:00Z", awaitingReply: true, videoUrl: "https://example.com/a" },
+      { id: "will-dismiss", author: "B", text: "Hey", likes: 2, publishedAt: "2026-08-21T12:00:00Z", awaitingReply: true, videoUrl: "https://example.com/b" },
+    ],
+  };
+
+  assert.deepEqual(context.channelAwaitingCommentIds(ch).sort(), ["still-open", "will-dismiss"]);
+  assert.equal(context.channelHasAwaitingComments(ch), true);
+
+  const beforeHtml = context.commentsHtml(ch);
+  assert.match(beforeHtml, /Needs reply/g);
+  const beforeFlagCount = (beforeHtml.match(/comment-flag/g) || []).length;
+  assert.equal(beforeFlagCount, 2);
+
+  context.dismissComments(["will-dismiss"]);
+
+  assert.equal(context.channelHasAwaitingComments(ch), true); // "still-open" remains
+  const afterHtml = context.commentsHtml(ch);
+  const afterFlagCount = (afterHtml.match(/comment-flag/g) || []).length;
+  assert.equal(afterFlagCount, 1);
+
+  context.dismissComments(["still-open"]);
+  assert.equal(context.channelHasAwaitingComments(ch), false);
 });

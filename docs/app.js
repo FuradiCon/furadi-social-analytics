@@ -336,20 +336,29 @@ function dismissComments(ids){
   return changed;
 }
 
+function channelAwaitingCommentIds(ch){
+  return (ch.comments || []).filter(c => c.awaitingReply).map(c => c.id).filter(Boolean);
+}
+
+function channelHasAwaitingComments(ch){
+  return (ch.comments || []).some(c => c.awaitingReply && !isCommentDismissed(c.id));
+}
+
 function commentsHtml(ch){
   if(!ch.comments || !ch.comments.length) return null;
   const renderContext = ++commentRenderSequence;
-  const comments = [...ch.comments].sort((a, b) => {
-    const awaitingOrder = Number(Boolean(b.awaitingReply)) - Number(Boolean(a.awaitingReply));
+  const withState = ch.comments.map(c => ({ c, awaiting: !!c.awaitingReply && !isCommentDismissed(c.id) }));
+  const comments = withState.sort((a, b) => {
+    const awaitingOrder = Number(b.awaiting) - Number(a.awaiting);
     if(awaitingOrder) return awaitingOrder;
-    return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+    return new Date(b.c.publishedAt).getTime() - new Date(a.c.publishedAt).getTime();
   });
-  return comments.map((c, index) => {
+  return comments.map(({ c, awaiting }, index) => {
     const textId = commentTextId(ch, renderContext, index);
     const author = escapeHtml(c.author);
     const reviewDestination = c.commentUrl || c.videoUrl;
     return `
-    <article class="comment-item${c.awaitingReply ? ' awaiting' : ''}" tabindex="-1">
+    <article class="comment-item${awaiting ? ' awaiting' : ''}" tabindex="-1">
       ${c.avatar
         ? `<img class="comment-avatar" src="${escapeHtml(c.avatar)}" alt="" loading="lazy" />`
         : `<div class="comment-avatar comment-avatar-fallback">${escapeHtml((c.author || '?').charAt(0).toUpperCase())}</div>`}
@@ -357,14 +366,14 @@ function commentsHtml(ch){
         <div class="comment-meta">
           <span class="comment-author">${author}</span>
           <span class="comment-time">${timeAgo(c.publishedAt)}</span>
-          ${c.awaitingReply ? '<span class="comment-flag">Needs reply</span>' : ''}
+          ${awaiting ? '<span class="comment-flag">Needs reply</span>' : ''}
         </div>
         <p class="comment-text" id="${textId}">${escapeHtml(c.text)}</p>
         <div class="comment-footer">
           <span>${fmtInt(c.likes)} likes</span>
           ${c.videoUrl ? `<a href="${escapeHtml(c.videoUrl)}" target="_blank" rel="noopener noreferrer">Open video</a>` : ''}
           <button class="comment-action comment-expand" type="button" hidden aria-expanded="false" aria-controls="${textId}" aria-label="Show full comment from ${author}">Show more</button>
-          ${c.awaitingReply ? (reviewDestination
+          ${awaiting ? (reviewDestination
             ? `<a class="comment-action comment-review" href="${escapeHtml(reviewDestination)}" target="_blank" rel="noopener noreferrer" aria-label="Review comment from ${author}">Review comment</a>`
             : `<button class="comment-action comment-review-local" type="button" aria-label="Review comment from ${author}">Review comment</button><span class="comment-review-status" aria-live="polite"></span>`) : ''}
         </div>
