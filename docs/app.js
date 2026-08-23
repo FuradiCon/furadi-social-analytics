@@ -299,6 +299,43 @@ function commentTextId(ch, renderContext, index){
   return `comment-${renderContext}-${String(ch.slug || 'channel').replace(/[^a-z0-9_-]/gi, '-')}-${index}-text`;
 }
 
+/* ---------- Dismissed "needs reply" flags ----------
+   Sticky per-browser dismissal, keyed by YouTube's own comment-thread ID
+   (assigned by the pipeline in fetch_recent_comments(), stable across runs).
+   Dismissing an ID stays dismissed even if a future hourly pipeline run
+   re-fetches the same still-unanswered comment -- only a genuinely new
+   comment (a new ID) can re-trigger the flag. Not synced to the desktop
+   widget on purpose: it has its own localStorage and keeps showing raw,
+   undismissed pipeline state. */
+const DISMISSED_COMMENTS_KEY = 'furadiDismissedComments';
+let dismissedCommentIds = null;
+
+function loadDismissedComments(){
+  if(dismissedCommentIds) return dismissedCommentIds;
+  try {
+    const raw = localStorage.getItem(DISMISSED_COMMENTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    dismissedCommentIds = new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    dismissedCommentIds = new Set();
+  }
+  return dismissedCommentIds;
+}
+
+function isCommentDismissed(id){
+  return !!id && loadDismissedComments().has(id);
+}
+
+function dismissComments(ids){
+  const set = loadDismissedComments();
+  let changed = false;
+  ids.forEach(id => {
+    if(id && !set.has(id)){ set.add(id); changed = true; }
+  });
+  if(changed) localStorage.setItem(DISMISSED_COMMENTS_KEY, JSON.stringify([...set]));
+  return changed;
+}
+
 function commentsHtml(ch){
   if(!ch.comments || !ch.comments.length) return null;
   const renderContext = ++commentRenderSequence;
