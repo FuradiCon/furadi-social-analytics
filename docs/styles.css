@@ -384,6 +384,7 @@ img{ max-width: 100%; display: block; }
 .section-label{ padding: 0; margin-bottom: var(--s3); }
 .comments-section-head{ display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); }
 .comments-section-head .section-label{ margin-bottom: 0; }
+.comment-clear-all{ font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary); }
 .hint{
   font-family: var(--font-mono); font-size: 10.5px;
   letter-spacing: .04em; text-transform: none;

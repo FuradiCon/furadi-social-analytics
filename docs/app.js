@@ -332,7 +332,13 @@ function dismissComments(ids){
   ids.forEach(id => {
     if(id && !set.has(id)){ set.add(id); changed = true; }
   });
-  if(changed) localStorage.setItem(DISMISSED_COMMENTS_KEY, JSON.stringify([...set]));
+  if(changed){
+    try {
+      localStorage.setItem(DISMISSED_COMMENTS_KEY, JSON.stringify([...set]));
+    } catch {
+      // Best-effort persistence — the in-memory Set still works for this session.
+    }
+  }
   return changed;
 }
 
@@ -432,7 +438,7 @@ function wireCommentActions(){
       if(!ch) return;
       const ids = channelAwaitingCommentIds(ch);
       dismissComments(ids);
-      ch.hasNewComments = ch.hasNewComments && !isCommentDismissed(ch.comments?.[0]?.id);
+      ch.hasNewComments = ch.hasNewComments && channelHasAwaitingComments(ch);
       renderComments(ch);
       updateCommentAlert(isIG(ch) || isTraffic(ch));
       updateFavicon(anyNewComments());
@@ -1710,6 +1716,14 @@ async function init(){
 
   CHANNELS = payload.channels || [];
   dashboardPayload = payload;
+  // Re-apply any prior-session "Clear all" dismissals: hasNewComments is raw
+  // pipeline state and knows nothing about the dismissal store, so without
+  // this a dismissed channel's envelope/favicon/rail-dot would come back lit
+  // on the next 20-minute auto-reload even though every comment is still
+  // individually dismissed.
+  CHANNELS.forEach(ch => {
+    ch.hasNewComments = ch.hasNewComments && channelHasAwaitingComments(ch);
+  });
   // Charts read oldest → newest, left to right; tables list newest first.
   CHANNELS.forEach(ch => { ch.tableRows = ch.data ? [...ch.data].reverse() : []; });
 

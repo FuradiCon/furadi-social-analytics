@@ -146,3 +146,24 @@ test("clearing every awaiting comment on a channel flips its effective hasNewCom
   assert.equal(ch.hasNewComments, false);
   assert.equal(context.channelHasAwaitingComments(ch), false);
 });
+
+test("a channel dismissed in a prior session reconciles hasNewComments back off on load", async () => {
+  const { context } = await loadDashboardContext();
+  const ch = {
+    slug: "reload-channel",
+    hasNewComments: true,
+    comments: [
+      { id: "awaiting-from-last-session", author: "A", text: "Hi", likes: 0, publishedAt: "2026-08-22T12:00:00Z", awaitingReply: true },
+    ],
+  };
+
+  // Simulate a prior session's "Clear all" click, whose dismissal is what
+  // would already be sitting in localStorage on a real page reload.
+  context.dismissComments([ch.comments[0].id]);
+
+  // Same reconciliation formula init() applies right after CHANNELS is
+  // assigned from the freshly fetched (raw, dismissal-unaware) payload.
+  ch.hasNewComments = ch.hasNewComments && context.channelHasAwaitingComments(ch);
+
+  assert.equal(ch.hasNewComments, false);
+});
