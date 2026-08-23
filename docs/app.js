@@ -426,6 +426,21 @@ function wireCommentDisclosureMeasurements(){
 
 function wireCommentActions(){
   document.addEventListener('click', event => {
+    const clearAllButton = event.target.closest('#commentClearAll');
+    if(clearAllButton){
+      const ch = CHANNELS[activeIdx];
+      if(!ch) return;
+      const ids = channelAwaitingCommentIds(ch);
+      dismissComments(ids);
+      ch.hasNewComments = ch.hasNewComments && !isCommentDismissed(ch.comments?.[0]?.id);
+      renderComments(ch);
+      updateCommentAlert(isIG(ch) || isTraffic(ch));
+      updateFavicon(anyNewComments());
+      buildRail();
+      syncRail();
+      return;
+    }
+
     const expandButton = event.target.closest('.comment-expand');
     if(expandButton){
       const card = expandButton.closest('.comment-item');
@@ -453,10 +468,12 @@ function wireCommentActions(){
 function renderComments(ch){
   const section = document.getElementById('commentsSection');
   const list = document.getElementById('commentList');
+  const clearAllButton = document.getElementById('commentClearAll');
   const html = commentsHtml(ch);
-  if(!html){ section.hidden = true; list.innerHTML = ''; return; }
+  if(!html){ section.hidden = true; list.innerHTML = ''; clearAllButton.hidden = true; return; }
   list.innerHTML = html;
   section.hidden = false;
+  clearAllButton.hidden = !channelHasAwaitingComments(ch);
   scheduleCommentDisclosures(list);
 }
 
@@ -746,6 +763,19 @@ function syncRail(){
   });
 }
 
+function updateCommentAlert(simple){
+  const alertEl = document.getElementById('commentAlert');
+  // Page-level question, so it matches the favicon: "is anything waiting?", not
+  // "does this channel have something?" (the rail envelopes answer that). Still
+  // hidden entirely on Instagram/traffic channels, which carry no comment data.
+  const hasNew = !simple && anyNewComments();
+  alertEl.classList.toggle('shown', !simple);
+  alertEl.classList.toggle('flag', hasNew);
+  const alertLabel = hasNew ? 'A comment is awaiting a reply' : 'Comments';
+  alertEl.title = alertLabel;
+  alertEl.setAttribute('aria-label', alertLabel);
+}
+
 function renderChannel(idx){
   activeIdx = idx;
   showSingle();
@@ -764,16 +794,7 @@ function renderChannel(idx){
   // per-video daily series — don't promise a "Daily performance" view for them.
   document.querySelector('.page-head h1').firstChild.nodeValue = ig ? 'Account performance' : traffic ? 'Page performance' : 'Daily performance';
 
-  const alertEl = document.getElementById('commentAlert');
-  // Page-level question, so it matches the favicon: "is anything waiting?", not
-  // "does this channel have something?" (the rail envelopes answer that). Still
-  // hidden entirely on Instagram/traffic channels, which carry no comment data.
-  const hasNew = !simple && anyNewComments();
-  alertEl.classList.toggle('shown', !simple);
-  alertEl.classList.toggle('flag', hasNew);
-  const alertLabel = hasNew ? 'A comment is awaiting a reply' : 'Comments';
-  alertEl.title = alertLabel;
-  alertEl.setAttribute('aria-label', alertLabel);
+  updateCommentAlert(simple);
 
   document.querySelector('.source').textContent = ch.dateRangeIso
     ? (ig ? 'instagram_analytics · ' : traffic ? 'goatcounter · ' : 'youtube_analytics · ') + ch.dateRangeIso

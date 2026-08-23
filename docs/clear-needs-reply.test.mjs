@@ -125,3 +125,24 @@ test("commentsHtml treats a dismissed comment as no longer awaiting", async () =
   context.dismissComments(["still-open"]);
   assert.equal(context.channelHasAwaitingComments(ch), false);
 });
+
+test("clearing every awaiting comment on a channel flips its effective hasNewComments off", async () => {
+  const { context } = await loadDashboardContext();
+  const ch = {
+    slug: "flip-channel",
+    hasNewComments: true,
+    comments: [
+      { id: "newest-awaiting", author: "A", text: "Hi", likes: 0, publishedAt: "2026-08-22T12:00:00Z", awaitingReply: true },
+      { id: "older-fine", author: "B", text: "Ok", likes: 0, publishedAt: "2026-08-01T12:00:00Z", awaitingReply: false },
+    ],
+  };
+
+  const ids = context.channelAwaitingCommentIds(ch);
+  assert.deepEqual(ids, ["newest-awaiting"]);
+
+  context.dismissComments(ids);
+  ch.hasNewComments = ch.hasNewComments && !context.isCommentDismissed(ch.comments[0].id);
+
+  assert.equal(ch.hasNewComments, false);
+  assert.equal(context.channelHasAwaitingComments(ch), false);
+});
