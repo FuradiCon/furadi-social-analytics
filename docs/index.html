@@ -93,7 +93,10 @@
       </section>
 
       <section class="block" id="commentsSection" hidden>
-        <p class="section-label">Recent comments <span class="hint">latest 4</span></p>
+        <div class="comments-section-head">
+          <p class="section-label">Recent comments <span class="hint">latest 4</span></p>
+          <button class="comment-action comment-clear-all" id="commentClearAll" type="button" hidden>Clear all</button>
+        </div>
         <div class="comment-list" id="commentList" aria-live="polite"></div>
       </section>
 
