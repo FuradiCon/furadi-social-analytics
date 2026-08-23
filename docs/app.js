@@ -299,20 +299,72 @@ function commentTextId(ch, renderContext, index){
   return `comment-${renderContext}-${String(ch.slug || 'channel').replace(/[^a-z0-9_-]/gi, '-')}-${index}-text`;
 }
 
+/* ---------- Dismissed "needs reply" flags ----------
+   Sticky per-browser dismissal, keyed by YouTube's own comment-thread ID
+   (assigned by the pipeline in fetch_recent_comments(), stable across runs).
+   Dismissing an ID stays dismissed even if a future hourly pipeline run
+   re-fetches the same still-unanswered comment -- only a genuinely new
+   comment (a new ID) can re-trigger the flag. Not synced to the desktop
+   widget on purpose: it has its own localStorage and keeps showing raw,
+   undismissed pipeline state. */
+const DISMISSED_COMMENTS_KEY = 'furadiDismissedComments';
+let dismissedCommentIds = null;
+
+function loadDismissedComments(){
+  if(dismissedCommentIds) return dismissedCommentIds;
+  try {
+    const raw = localStorage.getItem(DISMISSED_COMMENTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    dismissedCommentIds = new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    dismissedCommentIds = new Set();
+  }
+  return dismissedCommentIds;
+}
+
+function isCommentDismissed(id){
+  return !!id && loadDismissedComments().has(id);
+}
+
+function dismissComments(ids){
+  const set = loadDismissedComments();
+  let changed = false;
+  ids.forEach(id => {
+    if(id && !set.has(id)){ set.add(id); changed = true; }
+  });
+  if(changed){
+    try {
+      localStorage.setItem(DISMISSED_COMMENTS_KEY, JSON.stringify([...set]));
+    } catch {
+      // Best-effort persistence — the in-memory Set still works for this session.
+    }
+  }
+  return changed;
+}
+
+function channelAwaitingCommentIds(ch){
+  return (ch.comments || []).filter(c => c.awaitingReply).map(c => c.id).filter(Boolean);
+}
+
+function channelHasAwaitingComments(ch){
+  return (ch.comments || []).some(c => c.awaitingReply && !isCommentDismissed(c.id));
+}
+
 function commentsHtml(ch){
   if(!ch.comments || !ch.comments.length) return null;
   const renderContext = ++commentRenderSequence;
-  const comments = [...ch.comments].sort((a, b) => {
-    const awaitingOrder = Number(Boolean(b.awaitingReply)) - Number(Boolean(a.awaitingReply));
+  const withState = ch.comments.map(c => ({ c, awaiting: !!c.awaitingReply && !isCommentDismissed(c.id) }));
+  const comments = withState.sort((a, b) => {
+    const awaitingOrder = Number(b.awaiting) - Number(a.awaiting);
     if(awaitingOrder) return awaitingOrder;
-    return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+    return new Date(b.c.publishedAt).getTime() - new Date(a.c.publishedAt).getTime();
   });
-  return comments.map((c, index) => {
+  return comments.map(({ c, awaiting }, index) => {
     const textId = commentTextId(ch, renderContext, index);
     const author = escapeHtml(c.author);
     const reviewDestination = c.commentUrl || c.videoUrl;
     return `
-    <article class="comment-item${c.awaitingReply ? ' awaiting' : ''}" tabindex="-1">
+    <article class="comment-item${awaiting ? ' awaiting' : ''}" tabindex="-1">
       ${c.avatar
         ? `<img class="comment-avatar" src="${escapeHtml(c.avatar)}" alt="" loading="lazy" />`
         : `<div class="comment-avatar comment-avatar-fallback">${escapeHtml((c.author || '?').charAt(0).toUpperCase())}</div>`}
@@ -320,14 +372,14 @@ function commentsHtml(ch){
         <div class="comment-meta">
           <span class="comment-author">${author}</span>
           <span class="comment-time">${timeAgo(c.publishedAt)}</span>
-          ${c.awaitingReply ? '<span class="comment-flag">Needs reply</span>' : ''}
+          ${awaiting ? '<span class="comment-flag">Needs reply</span>' : ''}
         </div>
         <p class="comment-text" id="${textId}">${escapeHtml(c.text)}</p>
         <div class="comment-footer">
           <span>${fmtInt(c.likes)} likes</span>
           ${c.videoUrl ? `<a href="${escapeHtml(c.videoUrl)}" target="_blank" rel="noopener noreferrer">Open video</a>` : ''}
           <button class="comment-action comment-expand" type="button" hidden aria-expanded="false" aria-controls="${textId}" aria-label="Show full comment from ${author}">Show more</button>
-          ${c.awaitingReply ? (reviewDestination
+          ${awaiting ? (reviewDestination
             ? `<a class="comment-action comment-review" href="${escapeHtml(reviewDestination)}" target="_blank" rel="noopener noreferrer" aria-label="Review comment from ${author}">Review comment</a>`
             : `<button class="comment-action comment-review-local" type="button" aria-label="Review comment from ${author}">Review comment</button><span class="comment-review-status" aria-live="polite"></span>`) : ''}
         </div>
@@ -380,6 +432,21 @@ function wireCommentDisclosureMeasurements(){
 
 function wireCommentActions(){
   document.addEventListener('click', event => {
+    const clearAllButton = event.target.closest('#commentClearAll');
+    if(clearAllButton){
+      const ch = CHANNELS[activeIdx];
+      if(!ch) return;
+      const ids = channelAwaitingCommentIds(ch);
+      dismissComments(ids);
+      ch.hasNewComments = ch.hasNewComments && channelHasAwaitingComments(ch);
+      renderComments(ch);
+      updateCommentAlert(isIG(ch) || isTraffic(ch));
+      updateFavicon(anyNewComments());
+      buildRail();
+      syncRail();
+      return;
+    }
+
     const expandButton = event.target.closest('.comment-expand');
     if(expandButton){
       const card = expandButton.closest('.comment-item');
@@ -407,10 +474,12 @@ function wireCommentActions(){
 function renderComments(ch){
   const section = document.getElementById('commentsSection');
   const list = document.getElementById('commentList');
+  const clearAllButton = document.getElementById('commentClearAll');
   const html = commentsHtml(ch);
-  if(!html){ section.hidden = true; list.innerHTML = ''; return; }
+  if(!html){ section.hidden = true; list.innerHTML = ''; clearAllButton.hidden = true; return; }
   list.innerHTML = html;
   section.hidden = false;
+  clearAllButton.hidden = !channelHasAwaitingComments(ch);
   scheduleCommentDisclosures(list);
 }
 
@@ -700,6 +769,19 @@ function syncRail(){
   });
 }
 
+function updateCommentAlert(simple){
+  const alertEl = document.getElementById('commentAlert');
+  // Page-level question, so it matches the favicon: "is anything waiting?", not
+  // "does this channel have something?" (the rail envelopes answer that). Still
+  // hidden entirely on Instagram/traffic channels, which carry no comment data.
+  const hasNew = !simple && anyNewComments();
+  alertEl.classList.toggle('shown', !simple);
+  alertEl.classList.toggle('flag', hasNew);
+  const alertLabel = hasNew ? 'A comment is awaiting a reply' : 'Comments';
+  alertEl.title = alertLabel;
+  alertEl.setAttribute('aria-label', alertLabel);
+}
+
 function renderChannel(idx){
   activeIdx = idx;
   showSingle();
@@ -718,16 +800,7 @@ function renderChannel(idx){
   // per-video daily series — don't promise a "Daily performance" view for them.
   document.querySelector('.page-head h1').firstChild.nodeValue = ig ? 'Account performance' : traffic ? 'Page performance' : 'Daily performance';
 
-  const alertEl = document.getElementById('commentAlert');
-  // Page-level question, so it matches the favicon: "is anything waiting?", not
-  // "does this channel have something?" (the rail envelopes answer that). Still
-  // hidden entirely on Instagram/traffic channels, which carry no comment data.
-  const hasNew = !simple && anyNewComments();
-  alertEl.classList.toggle('shown', !simple);
-  alertEl.classList.toggle('flag', hasNew);
-  const alertLabel = hasNew ? 'A comment is awaiting a reply' : 'Comments';
-  alertEl.title = alertLabel;
-  alertEl.setAttribute('aria-label', alertLabel);
+  updateCommentAlert(simple);
 
   document.querySelector('.source').textContent = ch.dateRangeIso
     ? (ig ? 'instagram_analytics · ' : traffic ? 'goatcounter · ' : 'youtube_analytics · ') + ch.dateRangeIso
@@ -1643,6 +1716,14 @@ async function init(){
 
   CHANNELS = payload.channels || [];
   dashboardPayload = payload;
+  // Re-apply any prior-session "Clear all" dismissals: hasNewComments is raw
+  // pipeline state and knows nothing about the dismissal store, so without
+  // this a dismissed channel's envelope/favicon/rail-dot would come back lit
+  // on the next 20-minute auto-reload even though every comment is still
+  // individually dismissed.
+  CHANNELS.forEach(ch => {
+    ch.hasNewComments = ch.hasNewComments && channelHasAwaitingComments(ch);
+  });
   // Charts read oldest → newest, left to right; tables list newest first.
   CHANNELS.forEach(ch => { ch.tableRows = ch.data ? [...ch.data].reverse() : []; });
 
