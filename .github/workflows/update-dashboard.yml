@@ -32,6 +32,7 @@ jobs:
           echo '${{ secrets.YT_TOKEN_GROUP_A }}' > token_group_a_furadride.json
           echo '${{ secrets.YT_TOKEN_GROUP_B }}' > token_group_b_furadi_desertworks.json
           echo '${{ secrets.YT_TOKEN_GROUP_C }}' > token_group_c_furadigames.json
+          echo '${{ secrets.YT_TOKEN_GROUP_D }}' > token_group_d_desertworks.json
           echo '${{ secrets.INSTAGRAM_TOKEN }}' > instagram_token.json
           echo '${{ secrets.INSTAGRAM_CLIENT_SECRET }}' > instagram_client_secret.json
 

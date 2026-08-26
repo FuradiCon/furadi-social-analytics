@@ -30,7 +30,11 @@ CHANNEL_CFGS = [
      "platform": "YouTube", "accountType": "Channel",
      "accent": {"accent": "#00E5FF", "accentStrong": "#8FF3FF", "accentSoft": "#0A3A40"}},
     {"slug": "furadi-desert-works", "channel_id": "UCQPFdhFvSUO_C3uoxDh1tzA",
-     "token_path": os.path.join(SCRIPT_DIR, "token_group_b_furadi_desertworks.json"),
+     # Was group B (shared with Furadi) until 2026-08-26, when YouTube stopped
+     # letting one channel-bound token read a sibling brand channel's analytics
+     # -- group B kept working for Furadi and started 403ing here. Each channel
+     # now needs its own token, so Desert Works gets group D.
+     "token_path": os.path.join(SCRIPT_DIR, "token_group_d_desertworks.json"),
      "platform": "YouTube", "accountType": "Channel",
      "accent": {"accent": "#39FF14", "accentStrong": "#A6FF8C", "accentSoft": "#123312"}},
     {"slug": "furadi-games", "channel_id": "UCq9jOtMkVuEs8OaX34wPWNg",
