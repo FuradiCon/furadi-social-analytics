@@ -216,3 +216,53 @@ def test_build_keeps_instagram_bundle_when_a_thumbnail_download_fails(tmp_path, 
     assert ig["platform"] == "instagram"
     assert ig["followers"] == 1234
     assert len(ig["topVideos"]) == 2
+
+
+# --- regression test for the 2026-09-15 Instagram outage -------------------
+# Instagram vanished from data.json for six days and the workflow reported
+# success the whole time, because a per-channel failure only ever printed a
+# plain line that nothing surfaced.
+
+def test_channel_failures_emit_actions_annotations(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+
+    def failing_instagram(*a, **kw):
+        raise RuntimeError("gh secret set exploded")
+
+    published = build(
+        channel_cfgs=CHANNEL_CFGS,
+        channel_fetcher=_good_bundle,
+        instagram_fetcher=failing_instagram,
+        steadfast_fetcher=_failing_steadfast,
+        out_dir=str(tmp_path),
+    )
+
+    out = capsys.readouterr().out
+    # The surviving channel still publishes -- annotating must not block.
+    assert published is True
+    data = json.loads((tmp_path / "data.json").read_text())
+    assert [c["slug"] for c in data["channels"]] == ["furad-ride"]
+
+    assert "::error::" in out, "a failed channel must be visible in the Actions UI"
+    assert "[Instagram]" in out
+    assert "[Steadfast Counter]" in out
+
+
+def test_channel_failures_are_reported_outside_actions_too(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+
+    def failing_instagram(*a, **kw):
+        raise RuntimeError("gh secret set exploded")
+
+    build(
+        channel_cfgs=CHANNEL_CFGS,
+        channel_fetcher=_good_bundle,
+        instagram_fetcher=failing_instagram,
+        steadfast_fetcher=_failing_steadfast,
+        out_dir=str(tmp_path),
+    )
+
+    out = capsys.readouterr().out
+    assert "::error::" not in out, "the Actions prefix is noise when run by hand"
+    assert "[Instagram]" in out
+    assert "gh secret set exploded" in out
