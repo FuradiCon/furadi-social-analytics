@@ -71,16 +71,6 @@ body{
   -webkit-font-smoothing: antialiased;
 }
 
-/* Animated particle-network ground, drawn in <canvas>. Colour-matches the
-   active channel by reading --accent live (see app.js initBackground). */
-#bgCanvas{
-  position: fixed;
-  inset: 0;
-  width: 100vw; height: 100vh;
-  z-index: -1;
-  display: block;
-}
-
 h1, h2, h3{
   font-family: var(--font-display);
   font-weight: 600;
@@ -710,52 +700,6 @@ tr.peak td:first-child{ box-shadow: inset 2px 0 0 var(--accent); }
 .load-error{ padding: var(--s8) 0; }
 .load-error h1{ font-size: 28px; margin-bottom: var(--s3); }
 .load-error p{ color: var(--text-secondary); max-width: 52ch; }
-
-/* ============================ background switcher ======================== */
-.bg-switch{
-  display: flex; gap: var(--s1); width: fit-content;
-  background: var(--surface-translucent);
-  backdrop-filter: blur(17px) saturate(180%);
-  -webkit-backdrop-filter: blur(17px) saturate(180%);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: var(--s1);
-}
-.bg-switch-btn{
-  display: flex; align-items: center; justify-content: center;
-  background: transparent; border: 0; border-radius: var(--r-sm);
-  padding: var(--s2) var(--s4);
-  font-size: 13px; font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: color .16s ease, background-color .16s ease, transform .16s var(--ease-spring);
-}
-.bg-switch-btn:hover{ background: var(--surface-sunk); color: var(--ink); }
-.bg-switch-btn:active{ transform: scale(.97); }
-.bg-switch-btn[aria-pressed="true"]{ background: var(--ink); color: var(--surface); font-weight: 600; }
-.bg-only-btn{ padding: var(--s2); }
-
-.bg-restore-btn{
-  position: fixed; right: var(--s4); bottom: var(--s4); z-index: 10;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--surface-translucent);
-  backdrop-filter: blur(17px) saturate(180%);
-  -webkit-backdrop-filter: blur(17px) saturate(180%);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  padding: var(--s2);
-  color: var(--ink);
-  cursor: pointer;
-  transition: background-color .16s ease, transform .16s var(--ease-spring);
-}
-.bg-restore-btn:hover{ background: var(--surface-sunk); }
-.bg-restore-btn:active{ transform: scale(.95); }
-
-body.bg-only-mode .app{ display: none; }
-body.bg-only-mode .skip-link{ display: none; }
-
-/* Matrix reads best against true black rather than the usual graphite ground. */
-body.bg-matrix-active{ background: #000; }
 
 /* ============================ page-load reveal ========================== */
 @keyframes rise{
