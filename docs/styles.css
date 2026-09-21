@@ -66,7 +66,12 @@ html{ -webkit-text-size-adjust: 100%; }
 
 body{
   margin: 0;
-  background: var(--paper);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(rgba(244,244,244,.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(244,244,244,.055) 1px, transparent 1px);
+  background-size: 34px 34px;
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-body);
   font-size: 15px;

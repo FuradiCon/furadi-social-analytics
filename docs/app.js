@@ -672,8 +672,8 @@ function renderDivergingBars(containerId, rows){
     const cx = padL + (i + 0.5)/rows.length * innerW;
     const hG = (floor0(r.subG)/maxV) * half;
     const hL = (floor0(r.subL)/maxV) * half;
-    bars += `<rect class="bar" data-i="${i}" x="${(cx - bw/2).toFixed(1)}" y="${(mid - hG).toFixed(1)}" width="${bw.toFixed(1)}" height="${hG.toFixed(1)}" fill="var(--accent)" rx="1.5"/>`;
-    bars += `<rect class="bar" data-i="${i}" x="${(cx - bw/2).toFixed(1)}" y="${mid.toFixed(1)}" width="${bw.toFixed(1)}" height="${hL.toFixed(1)}" fill="var(--grey-bar-strong)" rx="1.5"/>`;
+    bars += `<rect class="bar" data-i="${i}" x="${(cx - bw/2).toFixed(1)}" y="${(mid - hG).toFixed(1)}" width="${bw.toFixed(1)}" height="${hG.toFixed(1)}" fill="var(--accent)"/>`;
+    bars += `<rect class="bar" data-i="${i}" x="${(cx - bw/2).toFixed(1)}" y="${mid.toFixed(1)}" width="${bw.toFixed(1)}" height="${hL.toFixed(1)}" fill="var(--grey-bar-strong)"/>`;
     if(i % 4 === 0 || i === rows.length - 1){
       xlabels += `<text x="${cx.toFixed(1)}" y="${H - 7}" text-anchor="middle" class="axis-text">${fmtDay(r.d)}</text>`;
     }
