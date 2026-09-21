@@ -123,8 +123,6 @@ img{ max-width: 100%; display: block; }
   scrollbar-width: none;        /* Firefox */
   -ms-overflow-style: none;     /* legacy Edge */
   background: var(--surface-translucent);
-  backdrop-filter: blur(17px) saturate(180%);
-  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-2);
@@ -334,8 +332,6 @@ img{ max-width: 100%; display: block; }
 .kpi{
   position: relative;
   background: var(--surface-translucent);
-  backdrop-filter: blur(17px) saturate(180%);
-  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-1);
@@ -390,8 +386,6 @@ img{ max-width: 100%; display: block; }
 .comment-item{
   display: flex; gap: var(--s3);
   background: var(--surface-translucent);
-  backdrop-filter: blur(17px) saturate(180%);
-  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-left: 3px solid var(--border);
   border-radius: var(--r-md);
@@ -461,8 +455,6 @@ img{ max-width: 100%; display: block; }
 .video-card{
   display: flex; flex-direction: column;
   background: var(--surface-translucent);
-  backdrop-filter: blur(17px) saturate(180%);
-  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-1);
@@ -501,8 +493,6 @@ img{ max-width: 100%; display: block; }
 .tabs{
   display: flex; gap: var(--s1); flex-wrap: wrap;
   background: var(--surface-translucent);
-  backdrop-filter: blur(17px) saturate(180%);
-  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-1);
@@ -534,8 +524,6 @@ img{ max-width: 100%; display: block; }
 /* ============================== cards =================================== */
 .card{
   background: var(--surface-translucent);
-  backdrop-filter: blur(17px) saturate(180%);
-  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-2);
@@ -626,8 +614,6 @@ tr.peak td:first-child{ box-shadow: inset 2px 0 0 var(--accent); }
 #viewAllWrap{ display: grid; gap: var(--s6); }
 .attention-summary{
   background: var(--surface-translucent);
-  backdrop-filter: blur(17px) saturate(180%);
-  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-2);
@@ -662,8 +648,6 @@ tr.peak td:first-child{ box-shadow: inset 2px 0 0 var(--accent); }
 .attention-metric-label{ display: block; color: var(--text-secondary); font-size: 10px; line-height: 1.3; }
 .viewall-channel{
   background: var(--surface-translucent);
-  backdrop-filter: blur(17px) saturate(180%);
-  -webkit-backdrop-filter: blur(17px) saturate(180%);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   border-radius: var(--r-lg);
