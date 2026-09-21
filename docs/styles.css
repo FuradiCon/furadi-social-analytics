@@ -733,7 +733,7 @@ tr.peak td:first-child{ box-shadow: inset 2px 0 0 var(--accent); }
   .rail-name{ font-size: 13px; }
   .page-head{ align-items: flex-start; flex-direction: column; gap: var(--s3); }
   .kpi-grid{ grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
-  .kpi-value{ font-size: 24px; }
+  .kpi-value{ font-size: 28px; }
   .card{ padding: var(--s4); }
   .viewall-channel{ padding: var(--s4); }
   .video-grid{ grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
