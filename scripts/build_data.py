@@ -12,6 +12,7 @@ SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
+from scripts.annotate import gh_error
 from scripts.datawindow import window_dates, prior_window_dates
 from scripts.dashboard_metadata import attach_account_metadata, build_dashboard_metadata
 from scripts.youtube_pipeline import fetch_channel_bundle
@@ -107,7 +108,7 @@ def build(channel_cfgs=None, channel_fetcher=fetch_channel_bundle,
             youtube_bundles.append(attach_account_metadata(bundle))
             any_success = True
         except Exception as e:
-            print(f"[{cfg['slug']}] FAILED: {e}")
+            gh_error(cfg["slug"], f"fetch failed: {type(e).__name__}: {e}")
 
     youtube_bundles.sort(
         key=lambda b: sum(row.get("views", 0) for row in b.get("data") or []),
@@ -121,7 +122,7 @@ def build(channel_cfgs=None, channel_fetcher=fetch_channel_bundle,
         channels_data.append(attach_account_metadata(ig_bundle))
         any_success = True
     except Exception as e:
-        print(f"[Instagram] FAILED: {e}")
+        gh_error("Instagram", f"fetch failed: {type(e).__name__}: {e}")
 
     # Steadfast Counter renders last -- it tracks a separate site's page
     # traffic, not a YouTube/Instagram account, so it sits outside the
@@ -131,10 +132,10 @@ def build(channel_cfgs=None, channel_fetcher=fetch_channel_bundle,
         channels_data.append(attach_account_metadata(steadfast_fetcher()))
         any_success = True
     except Exception as e:
-        print(f"[Steadfast Counter] FAILED: {e}")
+        gh_error("Steadfast Counter", f"fetch failed: {type(e).__name__}: {e}")
 
     if not any_success:
-        print("All fetches failed; leaving existing data.json untouched")
+        gh_error("build", "every fetch failed; leaving existing data.json untouched")
         return False
 
     payload = build_dashboard_metadata({

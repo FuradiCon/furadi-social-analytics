@@ -4,6 +4,8 @@ import subprocess
 import urllib.parse
 import urllib.request
 
+from scripts.annotate import gh_warning
+
 GRAPH_VERSION = "v21.0"
 GRAPH_BASE = f"https://graph.instagram.com/{GRAPH_VERSION}"
 
@@ -20,7 +22,18 @@ def http_get_json(url):
 
 
 def persist_refreshed_token(secret_name, new_token_json):
-    subprocess.run(["gh", "secret", "set", secret_name, "--body", new_token_json], check=True)
+    # The token goes on stdin, never in argv. `gh secret set NAME --body <json>`
+    # puts the live token in the command line, and subprocess folds the whole
+    # command into CalledProcessError's message -- so one failed write printed
+    # the rotated access token in plaintext to a PUBLIC repo's Actions log, on
+    # every run, for six days. Actions only masks secrets it already knows, and
+    # a freshly-rotated token is by definition not one of them.
+    subprocess.run(
+        ["gh", "secret", "set", secret_name],
+        input=new_token_json,
+        text=True,
+        check=True,
+    )
 
 
 def get_access_token(token_file, app_id, app_secret):
@@ -39,7 +52,24 @@ def get_access_token(token_file, app_id, app_secret):
     expires_in = refresh_resp.get("expires_in", 60 * 24 * 3600)
     new_expires_at = (datetime.datetime.now() + datetime.timedelta(seconds=expires_in)).isoformat()
     new_data = {"access_token": long_token, "expires_at": new_expires_at, "ig_user_id": data["ig_user_id"]}
-    persist_refreshed_token("INSTAGRAM_TOKEN", json.dumps(new_data))
+
+    # Failing to SAVE the rotated token must not destroy this run's fetch. The
+    # token we're holding is valid right now -- only the write-back failed --
+    # so carry on and report loudly. Letting this raise is what dropped
+    # Instagram out of data.json entirely for six days when GH_SECRETS_PAT
+    # expired, even though the Graph API was answering perfectly.
+    try:
+        persist_refreshed_token("INSTAGRAM_TOKEN", json.dumps(new_data))
+    except Exception as e:
+        gh_warning(
+            "Instagram",
+            f"refreshed the access token but could not write it back to the "
+            f"INSTAGRAM_TOKEN secret ({type(e).__name__}). Using it for this run "
+            f"only -- the stored copy is now stale, so this will repeat until "
+            f"GH_SECRETS_PAT is renewed. Re-auth will be needed if the stored "
+            f"token lapses before then.",
+        )
+
     return long_token, data["ig_user_id"]
 
 
