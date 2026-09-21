@@ -76,11 +76,11 @@ body{
 
 h1, h2, h3{
   font-family: var(--font-display);
-  font-weight: 600;
-  font-stretch: 92%;              /* Archivo's width axis, pulled in a touch */
-  letter-spacing: -.03em;
+  font-weight: 700;
+  letter-spacing: -.045em;
+  text-transform: uppercase;
   margin: 0;
-  line-height: 1.15;
+  line-height: 1;
 }
 
 a{ color: inherit; }
@@ -133,17 +133,17 @@ img{ max-width: 100%; display: block; }
 .rail-brand{ display: flex; align-items: center; padding: 0 var(--s2) var(--s5); }
 .rail-brand-text{ display: flex; flex-direction: column; line-height: 1.2; }
 .rail-brand-text b{
-  font-family: var(--font-display); font-weight: 700; font-stretch: 92%;
+  font-family: var(--font-display); font-weight: 700;
   letter-spacing: -.03em; font-size: 16px;
 }
 .rail-brand-text span{
-  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em;
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .2em;
   text-transform: uppercase; color: var(--text-secondary);
 }
 
 .rail-label, .section-label{
   font-family: var(--font-mono);
-  font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+  font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase;
   color: var(--text-secondary);
   margin: 0 0 var(--s3);
   padding: 0 var(--s2);
@@ -189,7 +189,7 @@ img{ max-width: 100%; display: block; }
 .account-platform-label{
   display: block;
   font-family: var(--font-mono); font-size: 9.5px; line-height: 1.35;
-  letter-spacing: .08em; text-transform: uppercase;
+  letter-spacing: .2em; text-transform: uppercase;
   color: var(--text-secondary);
 }
 .channel-tab-btn > .account-platform-label{
@@ -240,12 +240,8 @@ img{ max-width: 100%; display: block; }
 .eyebrow{
   margin: 0 0 var(--s2);
   font-family: var(--font-mono); font-size: 11px;
-  letter-spacing: .12em; text-transform: uppercase;
-  color: var(--accent-soft);
-  display: inline-block;
-  background: var(--accent);
-  padding: 3px var(--s2);
-  border-radius: var(--r-sm);
+  letter-spacing: .2em; text-transform: uppercase;
+  color: var(--text-secondary);
 }
 .active-account-platform-label{ margin: 0 0 var(--s2); }
 .page-head h1{
@@ -346,12 +342,12 @@ img{ max-width: 100%; display: block; }
 .kpi-label{
   margin: 0 0 var(--s2);
   font-family: var(--font-mono); font-size: 10.5px;
-  letter-spacing: .09em; text-transform: uppercase;
+  letter-spacing: .2em; text-transform: uppercase;
   color: var(--text-secondary);
 }
 .kpi-value{
   font-family: var(--font-display);
-  font-weight: 700; font-stretch: 92%;
+  font-weight: 700;
   font-size: 29px; letter-spacing: -.035em; line-height: 1.05;
   font-variant-numeric: tabular-nums;
 }
@@ -373,10 +369,10 @@ img{ max-width: 100%; display: block; }
 .section-label{ padding: 0; margin-bottom: var(--s3); }
 .comments-section-head{ display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); }
 .comments-section-head .section-label{ margin-bottom: 0; }
-.comment-action.comment-clear-all{ font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary); }
+.comment-action.comment-clear-all{ font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--text-secondary); }
 .hint{
   font-family: var(--font-mono); font-size: 10.5px;
-  letter-spacing: .04em; text-transform: none;
+  letter-spacing: .16em; text-transform: uppercase;
   color: var(--text-secondary);
   margin-left: var(--s2);
 }
@@ -503,7 +499,9 @@ img{ max-width: 100%; display: block; }
   position: relative;
   background: transparent; border: 0; border-radius: var(--r-sm);
   padding: var(--s2) var(--s4);
-  font-size: 13.5px; font-weight: 500;
+  font-family: var(--font-mono);
+  font-size: 10.5px; font-weight: 500;
+  letter-spacing: .2em; text-transform: uppercase;
   color: var(--text-secondary);
   cursor: pointer;
   transition: color .16s ease, background-color .16s ease, transform .16s var(--ease-spring);
@@ -534,7 +532,11 @@ img{ max-width: 100%; display: block; }
   display: flex; align-items: baseline; justify-content: space-between;
   gap: var(--s3); margin-bottom: var(--s4);
 }
-.card-title h2{ font-size: 16px; }
+.card-title h2{
+  font-family: var(--font-mono);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: .24em; text-transform: uppercase;
+}
 .card-table{ padding: var(--s4) var(--s4) var(--s2); }
 .card-table .card-title{ padding: var(--s1) var(--s2) 0; }
 
@@ -596,7 +598,7 @@ th, td{
   text-align: left; white-space: nowrap;
 }
 th{
-  font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
   font-weight: 500; color: var(--text-secondary);
   border-bottom: 1px solid var(--border-strong);
   position: sticky; top: 0; background: var(--surface);
