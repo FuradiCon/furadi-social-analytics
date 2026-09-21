@@ -550,7 +550,7 @@ function renderAreaChart(containerId, rows, key, opts = {}){
   const peakIdx = vals.indexOf(Math.max(...vals));
   const peakEl = opts.markPeak ? `
     <line x1="${x(peakIdx).toFixed(1)}" x2="${x(peakIdx).toFixed(1)}" y1="${y(vals[peakIdx]).toFixed(1)}" y2="${(padT + innerH).toFixed(1)}" stroke="${color}" stroke-width="1" stroke-dasharray="2,3" opacity="0.5"/>
-    <circle cx="${x(peakIdx).toFixed(1)}" cy="${y(vals[peakIdx]).toFixed(1)}" r="4" fill="${color}" stroke="var(--surface)" stroke-width="2"/>
+    <circle cx="${x(peakIdx).toFixed(1)}" cy="${y(vals[peakIdx]).toFixed(1)}" r="4" fill="${color}" stroke="var(--paper)" stroke-width="2"/>
     <text x="${x(peakIdx).toFixed(1)}" y="${(y(vals[peakIdx]) - 11).toFixed(1)}" text-anchor="middle" class="peak-text">${fmtDay(rows[peakIdx].d)} · ${fmtValue(vals[peakIdx])}</text>
   ` : '';
 
@@ -568,7 +568,7 @@ function renderAreaChart(containerId, rows, key, opts = {}){
     ${peakEl}
     ${xlabels}
     <line class="guide" x1="0" x2="0" y1="${padT}" y2="${padT + innerH}" stroke="var(--text-secondary)" stroke-width="1" stroke-dasharray="2,3" opacity="0"/>
-    <circle class="dot" r="4.5" fill="${color}" stroke="var(--surface)" stroke-width="2" opacity="0"/>
+    <circle class="dot" r="4.5" fill="${color}" stroke="var(--paper)" stroke-width="2" opacity="0"/>
     <rect class="hover-target" x="${padL}" y="${padT}" width="${innerW}" height="${innerH}" fill="transparent"/>
   </svg>
   <div class="tooltip" role="status"></div>`;
