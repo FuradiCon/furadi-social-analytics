@@ -1,27 +1,28 @@
 /* ============================================================================
    Furadi · Social Analytics
    ----------------------------------------------------------------------------
-   Direction: a dark instrument panel over a network/particle field. Graphite-
-   black ground (a duotone recolour of the studio's own background art), glass
-   surfaces. The five brand colours are saturated, so they are used as
-   PLOTTED MARKS — traces, chips, spines, bar fills — never as glow and never as
-   small text directly on the ground. Where an accent has to carry text it flips
-   to --accent-soft (its dark tint) on an --accent-strong wash — a self-contained
-   pairing, unaffected by the page being dark.
+   Direction: a monochrome, hairline-bordered visual language on a black
+   ground with a blueprint grid. Surfaces carry no fill of their own — they
+   are defined by their edge, not a glass or shadow behind them. The five
+   brand colours are saturated, so they are used as PLOTTED MARKS — traces,
+   chips, spines, bar fills — never as glow and never as small text directly
+   on the ground. Where an accent has to carry text it flips to --accent-soft
+   (its dark tint) on an --accent-strong wash — a self-contained pairing,
+   unaffected by the page being dark.
    ========================================================================== */
 
 :root{
   /* --- ground / ink --------------------------------------------------- */
-  --paper:              #1A1B1E;   /* page ground, under the network art       */
-  --surface:            #2A2C31;   /* solid: chips, badges, sticky headers     */
-  --surface-sunk:       #202125;   /* inset: table stripes, thumb wells        */
-  --surface-translucent:rgba(42,44,49,.2);   /* glass: cards, rail, tabs       */
-  --ink:                #F1F2F4;   /* near-white, warm-neutral                 */
-  --text-secondary:     #9BA2AC;   /* labels, axes, captions                   */
-  --border:             rgba(241,242,244,.10);   /* hairlines                 */
-  --border-strong:      rgba(241,242,244,.18);   /* baselines that must read  */
+  --paper:              #000;      /* page ground, under the blueprint grid    */
+  --surface:            rgba(244,244,244,.07); /* solid-ish: chips, sticky th  */
+  --surface-sunk:       rgba(244,244,244,.04); /* inset: table stripes, wells  */
+  --surface-translucent:transparent;           /* surfaces are edges, not fill */
+  --ink:                #F4F4F4;
+  --text-secondary:     #8B8B8B;   /* labels, axes, captions                   */
+  --border:             rgba(244,244,244,.16); /* hairlines                   */
+  --border-strong:      rgba(244,244,244,.32); /* baselines that must read    */
 
-  /* --- semantics (deliberately outside the five brand hues) ------------ */
+  /* --- semantics: the one deliberate exception to the monochrome rule --- */
   --up:    #3FCE96;
   --down:  #E15C54;
   --flat:  #8B93A0;
@@ -30,13 +31,15 @@
   --grey-bar:        #464A52;
   --grey-bar-strong: #A7AEB9;
 
-  /* --- accent: overwritten per account by applyAccent() ----------------- */
+  /* --- accent: overwritten per account by applyAccent(). Reaches only
+         plotted marks -- chart trace, rail sparkline, KPI spine, the
+         active rail row, and .comment-item.awaiting. ------------------- */
   --accent:        #FF5A00;
   --accent-strong: #FFB37A;
   --accent-soft:   #4A2410;
 
   /* --- type ------------------------------------------------------------ */
-  --font-display: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Saira Condensed', 'Arial Narrow', Arial, sans-serif;
   --font-body:    'Public Sans', 'Segoe UI', system-ui, sans-serif;
   --font-mono:    'Spline Sans Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
 
@@ -44,13 +47,13 @@
   --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
   --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
 
-  /* --- radii ------------------------------------------------------------ */
-  --r-sm: 4px; --r-md: 7px; --r-lg: 10px;
+  /* --- radii: square. Zeroed here covers all 30 usages. ---------------- */
+  --r-sm: 0; --r-md: 0; --r-lg: 0;
 
-  /* --- depth: base → elevated → floating. Black-tinted, not blue. -------- */
-  --shadow-1: inset 0 1px 0 rgba(255,255,255,.04), 0 2px 6px rgba(0,0,0,.35);
-  --shadow-2: inset 0 1px 0 rgba(255,255,255,.05), 0 10px 24px -8px rgba(0,0,0,.5);
-  --shadow-float: 0 2px 10px rgba(0,0,0,.4), 0 24px 48px -16px rgba(0,0,0,.55);
+  /* --- depth: none. Surfaces are defined by their edge. ---------------- */
+  --shadow-1: none;
+  --shadow-2: none;
+  --shadow-float: none;
 
   --ease-spring: cubic-bezier(.22,1,.36,1);
 }
